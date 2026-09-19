@@ -27,4 +27,4 @@ jobs:
       - name: Tests with MySQL migrations and concurrent writes
         run: dotnet test SteamMuseum.sln --no-build --configuration Release
         env:
-          MUSEUM_TEST_MYSQL: Server=127.0.0.1;Port=3306;User=root;Password=ci-disposable-password;SslMode=Disabled
+          MUSEUM_TEST_MYSQL: Server=127.0.0.1;Port=3306;User=root;Password=ci-disposable-password;SslMode=Disabled;allowPublicKeyRetrieval=true;useSSL=False
