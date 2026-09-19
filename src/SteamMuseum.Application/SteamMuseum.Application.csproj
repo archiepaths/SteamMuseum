@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><ProjectReference Include="../SteamMuseum.Domain/SteamMuseum.Domain.csproj" /></ItemGroup>
+</Project>

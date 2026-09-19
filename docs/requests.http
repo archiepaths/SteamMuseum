@@ -1,0 +1,100 @@
+@base = https://localhost:7240
+@csrf = obtain-from-api-auth-csrf
+@windowId = replace-with-window-id
+@memberId = replace-with-member-id
+@railwayId = replace-with-railway-id
+@locomotiveId = replace-with-locomotive-id
+@dutyId = replace-with-duty-id
+@assignmentId = replace-with-assignment-id
+
+### Use an HTTP client that retains cookies. Fetch a new CSRF token after login/password change.
+GET {{base}}/api/auth/csrf
+
+### Sign in (copy csrf response token above)
+POST {{base}}/api/auth/login
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"email":"admin@example.org","password":"your-temporary-password"}
+
+### After login: fetch /api/auth/csrf again, then change the temporary password
+POST {{base}}/api/auth/password
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"currentPassword":"your-temporary-password","newPassword":"your-new-long-password"}
+
+### Current account
+GET {{base}}/api/auth/me
+
+### Administrator creates a member (password must have upper/lower case, digit and symbol)
+POST {{base}}/api/accounts
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"email":"member@example.org","displayName":"Example Member","temporaryPassword":"Replace-this-password-123!","roles":["Member"]}
+
+### Open a calendar month (adjust dates and deadline)
+POST {{base}}/api/windows
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"name":"October 2030","kind":"Monthly","start":"2030-10-01","end":"2030-10-31","submissionDeadlineUtc":"2030-09-30T22:59:00Z"}
+
+### Signed-in member supplies availability; omitted dates keep their existing values
+PUT {{base}}/api/me/availability/{{windowId}}
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{
+  "maximumAssignments":4,
+  "days":[
+    {"date":"2030-10-07","status":"Available","from":null,"until":null,"preferredRole":null,"note":null},
+    {"date":"2030-10-08","status":"Available","from":"10:00:00","until":"16:00:00","preferredRole":"Driver","note":"Prefer driving if possible"}
+  ]
+}
+
+### Create reference data (administrator)
+POST {{base}}/api/railways
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"name":"Museum Railway"}
+
+### Create a locomotive (administrator)
+POST {{base}}/api/locomotives
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"name":"Locomotive A"}
+
+### Record an assessed competence (assessor)
+POST {{base}}/api/competences
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"memberId":"{{memberId}}","role":"Driver","railwayId":"{{railwayId}}","locomotiveId":"{{locomotiveId}}","validFrom":"2030-01-01","validUntil":"2030-12-31","evidence":"Practical assessment completed; reference AS-001"}
+
+### Create a single-role duty (planner)
+POST {{base}}/api/duties
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"name":"Operating day driver","date":"2030-10-07","start":"09:00:00","end":"17:00:00","role":"Driver","railwayId":"{{railwayId}}","locomotiveId":"{{locomotiveId}}"}
+
+### Assign qualified, available member (planner)
+POST {{base}}/api/duties/{{dutyId}}/assignment
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"memberId":"{{memberId}}"}
+
+### Publish after rechecking all rules
+POST {{base}}/api/assignments/{{assignmentId}}/publish
+X-CSRF-TOKEN: {{csrf}}
+
+### Planner sees assignments and current conflicts
+GET {{base}}/api/roster?from=2030-10-01&until=2030-10-31
+
+### Member sees only their published assignments
+GET {{base}}/api/me/roster?from=2030-10-01&until=2030-10-31

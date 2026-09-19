@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><UserSecretsId>SteamMuseum-Development</UserSecretsId></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../SteamMuseum.Infrastructure/SteamMuseum.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9"><PrivateAssets>all</PrivateAssets><IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets></PackageReference>
+    <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+  </ItemGroup>
+</Project>
