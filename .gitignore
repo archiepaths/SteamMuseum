@@ -4,7 +4,6 @@
 .env
 TestResults/
 *.user
-secrets/
 **/node_modules/
 **/dist/
 **/.vite/
