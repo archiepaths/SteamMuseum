@@ -5,3 +5,11 @@
 TestResults/
 *.user
 secrets/
+**/node_modules/
+**/dist/
+**/.vite/
+*.tsbuildinfo
+**/coverage/
+**/.npm-cache/
+**/.env.local
+**/.env.*.local

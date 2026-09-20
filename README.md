@@ -1,6 +1,6 @@
 # Steam Museum API
 
-A working first backend for staff availability, competence records and rostering, built with .NET 10, EF Core 10 and MySQL. The React frontend is not included yet.
+A staff application for availability, competence records and rostering, built with React, TypeScript, .NET 10, EF Core 10 and MySQL.
 
 ## Included
 
@@ -12,7 +12,7 @@ A working first backend for staff availability, competence records and rostering
 - Duties, draft assignments, publication and cancellation. Qualification, availability, overlap and maximum-assignment checks are enforced on the server.
 - Audit records for business changes and account administration, OpenAPI in development, database migrations, example requests and automated tests.
 
-Fleet maintenance, the full rolling stock register, group bookings, Xero integration, competence import and the React UI are future modules. The locomotive list here is reference data for qualifications and duties, not a maintenance system.
+The [React staff frontend](src/SteamMuseum.Web/README.md) includes member, planner, assessor and administrator workflows. Fleet maintenance, the full rolling stock register, group bookings, Xero integration and competence import are future modules. The locomotive list here is reference data for qualifications and duties, not a maintenance system.
 
 ## Architecture
 
@@ -22,6 +22,7 @@ src/
   SteamMuseum.Application/     Use cases, request/response contracts and persistence ports
   SteamMuseum.Infrastructure/  EF Core/MySQL, migrations and ASP.NET Core Identity
   SteamMuseum.Api/             HTTP endpoints, authorization policies and composition root
+  SteamMuseum.Web/             React staff frontend, API client and browser/component tests
 tests/
   SteamMuseum.Tests/           Domain rules, authenticated API workflows and concurrency tests
 ```
@@ -80,6 +81,16 @@ Requirements: .NET 10 SDK, and MySQL (the Compose setup uses MySQL 8.4), or Dock
    API: `https://localhost:7240`. Liveness: `/health/live`. The OpenAPI document at `/openapi/v1.json` is available in Development after signing in as an administrator and changing the temporary password. No Swagger UI is bundled.
 
 For persistent local configuration, use `dotnet user-secrets --project src/SteamMuseum.Api set "ConnectionStrings:Museum" "..."` instead of committing credentials. Normal startup neither migrates the database nor creates accounts.
+
+6. Start the React frontend (Node.js 22.12+):
+
+   ```powershell
+   Set-Location src/SteamMuseum.Web
+   npm ci
+   npm run dev
+   ```
+
+   Open `https://localhost:5173` and sign in with your administrator account. See the [frontend guide](src/SteamMuseum.Web/README.md) for local certificates, API configuration, tests and production hosting.
 
 ## Authentication from React
 
@@ -171,7 +182,7 @@ dotnet ef migrations add YourChange --project src/SteamMuseum.Infrastructure --s
 
 ## Next modules
 
-1. React member calendar: select recurring weekdays, adjust individual dates/times, choose a preferred role, set maximum shifts and view published duties.
-2. Planner calendar, eligibility explanations and conflict review; competence export import with preview and manual verification.
+1. Candidate eligibility previews and richer planner calendar views.
+2. Competence export/import with preview and manual verification.
 3. Locomotive and rolling stock asset details, maintenance records, scheduled work and service restrictions that also gate assignments.
 4. Group bookings and pricing; Xero OAuth connection, invoice mapping, idempotent creation, retry/reconciliation and invoice status updates. No Xero credentials or API calls are part of this implementation.
