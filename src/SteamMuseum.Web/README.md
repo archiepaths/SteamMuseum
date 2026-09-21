@@ -11,7 +11,15 @@ npm ci
 npm run dev
 ```
 
-Open `https://localhost:5173`. Development defaults to the API at `https://localhost:7240`. Both must use `localhost` and HTTPS for the API's Secure, SameSite=Strict session cookies. Vite generates a local self-signed development certificate; trust it locally in your browser, and trust the API's ASP.NET development certificate as described in the root README. Never use development certificates in production.
+Open `https://localhost:5173`. Development defaults to the API at `https://localhost:7240`. Both must use `localhost` and HTTPS for the API's Secure, SameSite=Strict session cookies. Vite uses the trusted ASP.NET development certificate exported to the git-ignored `secrets/localhost.pem` and `secrets/localhost.key` files. Once per development machine, run from the repository root:
+
+```powershell
+New-Item -ItemType Directory -Force secrets
+dotnet dev-certs https --trust
+dotnet dev-certs https --export-path secrets/localhost.pem --format PEM --no-password
+```
+
+Accept the operating system's trust prompt, then restart Vite. Do not enable `@vitejs/plugin-basic-ssl` alongside these files: it overrides the trusted certificate. Build and unit-test commands do not require certificate files. Never use development certificates in production.
 
 For a different API URL, copy `.env.example` to `.env.local`, edit `VITE_API_URL`, and restart Vite. This value is public build-time configuration; never put secrets in Vite environment variables. The API must allow the exact frontend origin in `Cors:Origins`.
 

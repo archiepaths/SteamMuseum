@@ -5,6 +5,7 @@ A staff application for availability, competence records and rostering, built wi
 ## Included
 
 - ASP.NET Core Identity: administrator-created accounts, secure cookie sessions, login lockout, password changes, administrator password resets and account deactivation.
+- Optional native-app authentication: self-hosted OpenID Connect authorization code + S256 PKCE, short-lived JWT access tokens, rotating refresh tokens and immediate account/session revocation. See the [mobile authentication guide](docs/mobile-authentication.md).
 - Member, Planner, Assessor and Administrator access roles. Roles can be combined; changing roles revokes existing sessions.
 - Monthly and special-event availability windows, deadlines and open/close controls.
 - Whole-day or time-limited availability, optional preferred role, notes and maximum assignments per window.
@@ -29,7 +30,7 @@ tests/
 
 Dependencies point inward: Application -> Domain; Infrastructure -> Application; API composes Infrastructure and Application. The business layer does not reference EF Core, ASP.NET Core or MySQL. Authentication implementation is kept in Infrastructure; business use cases are in Application.
 
-MySQL provider: `MySql.EntityFrameworkCore` 10.0.9. EF Core and ASP.NET package versions are pinned to 10.0.9. Explicit converters preserve `DateOnly` and `TimeOnly` in the domain while mapping to MySQL `date` and `time(6)`. Relational joins avoid provider-specific GUID collection translation issues.
+MySQL provider: `MySql.EntityFrameworkCore` 10.0.9. ASP.NET packages are pinned to 10.0.9; OpenIddict 7.7.1 resolves EF Core runtime dependencies to 10.0.11. Explicit converters preserve `DateOnly` and `TimeOnly` in the domain while mapping to MySQL `date` and `time(6)`. Relational joins avoid provider-specific GUID collection translation issues.
 
 ## Run locally
 

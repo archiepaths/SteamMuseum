@@ -21,11 +21,12 @@ public sealed class AuthController(AccountService accounts) : ControllerBase
     public async Task<IActionResult> Logout() { await accounts.Logout(User); return NoContent(); }
     [HttpPost("password")]
     public async Task<IActionResult> Password(ChangePasswordRequest request)
-    { await accounts.ChangePassword(User, request.CurrentPassword, request.NewPassword); return NoContent(); }
+    { await accounts.ChangePassword(User, request.CurrentPassword, request.NewPassword, !HttpContext.Items.ContainsKey(MobileAuthentication.ValidBearerItem)); return NoContent(); }
 }
 public sealed record LoginRequest([Required, EmailAddress, MaxLength(256)] string Email, [Required, MaxLength(256)] string Password);
 public sealed record ChangePasswordRequest([Required, MaxLength(256)] string CurrentPassword, [Required, MinLength(12), MaxLength(256)] string NewPassword);
 public sealed record NameRequest([Required, MaxLength(150)] string Name);
+public sealed record WindowNotesRequest([MaxLength(2000)] string? Notes);
 public sealed record WindowStateRequest(bool Open, DateTime DeadlineUtc);
 public sealed record AssignRequest(Guid MemberId);
 public sealed record ReasonRequest([Required, MaxLength(500)] string Reason);
@@ -45,6 +46,8 @@ public sealed class MuseumController(MuseumService museum) : ControllerBase
     public async Task<IActionResult> CreateWindow(WindowRequest request, CancellationToken ct) => Ok(await museum.CreateWindow(Actor, request, ct));
     [HttpPut("windows/{id:guid}/state"), Authorize(Policy = "Planning")]
     public async Task<IActionResult> SetWindow(Guid id, WindowStateRequest request, CancellationToken ct) => Ok(await museum.SetWindowOpen(Actor, id, request.Open, request.DeadlineUtc, ct));
+    [HttpPut("windows/{id:guid}/notes"), Authorize(Policy = "Planning")]
+    public async Task<IActionResult> SetWindowNotes(Guid id, WindowNotesRequest request, CancellationToken ct) => Ok(await museum.SetWindowNotes(Actor, id, request.Notes, ct));
     [HttpGet("me/availability/{windowId:guid}")]
     public async Task<IActionResult> Availability(Guid windowId, CancellationToken ct) => Ok(await museum.Availability(Actor, windowId, ct));
     [HttpPut("me/availability/{windowId:guid}")]

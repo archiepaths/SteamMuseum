@@ -21,7 +21,7 @@ public static class AccessRoles
     public const string Member = "Member", Planner = "Planner", Assessor = "Assessor", Administrator = "Administrator";
     public static readonly string[] All = [Member, Planner, Assessor, Administrator];
 }
-public sealed record WindowRequest(string Name, WindowKind Kind, DateOnly Start, DateOnly End, DateTime SubmissionDeadlineUtc);
+public sealed record WindowRequest(string Name, WindowKind Kind, DateOnly Start, DateOnly End, DateTime SubmissionDeadlineUtc, List<WindowDateRange>? DateRanges = null, string? Notes = null);
 public sealed record DayRequest(DateOnly Date, AvailabilityStatus Status, TimeOnly? From, TimeOnly? Until, DutyRole? PreferredRole, string? Note);
 public sealed record AvailabilityRequest(int? MaximumAssignments, List<DayRequest> Days);
 public sealed record AvailabilityView(AvailabilityWindow Window, int? MaximumAssignments, int Assigned, List<DailyAvailability> Days);

@@ -21,7 +21,17 @@ public sealed class AvailabilityWindow : Entity
     public DateOnly End { get; set; }
     public DateTime SubmissionDeadlineUtc { get; set; }
     public bool IsOpen { get; set; } = true;
-    public bool Contains(DateOnly day) => day >= Start && day <= End;
+    public string? Notes { get; set; }
+    public List<WindowDateRange> DateRanges { get; set; } = [];
+    // Empty ranges preserve the dates of windows created before multi-range support.
+    public bool Contains(DateOnly day) => DateRanges.Count == 0
+        ? day >= Start && day <= End
+        : DateRanges.Any(range => day >= range.Start && day <= range.End);
+}
+public sealed class WindowDateRange
+{
+    public DateOnly Start { get; set; }
+    public DateOnly End { get; set; }
 }
 // Shared across overlapping windows: one response per member and calendar date.
 public sealed class DailyAvailability : Entity

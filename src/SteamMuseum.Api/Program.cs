@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -9,6 +10,9 @@ using Microsoft.EntityFrameworkCore;
 using SteamMuseum.Application;
 using SteamMuseum.Domain;
 using SteamMuseum.Infrastructure;
+using SteamMuseum.Api;
+using OpenIddict.Abstractions;
+using OpenIddict.Validation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var connection = builder.Configuration.GetConnectionString("Museum")
@@ -24,6 +28,7 @@ builder.Services.AddIdentity<MuseumUser, IdentityRole<Guid>>(options => {
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
 }).AddEntityFrameworkStores<MuseumDbContext>().AddDefaultTokenProviders();
+builder.AddMuseumMobileAuthentication();
 builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.Zero);
 builder.Services.ConfigureApplicationCookie(o => {
     o.Cookie.Name = "__Host-SteamMuseum";
@@ -46,6 +51,7 @@ builder.Services.AddAntiforgery(o => {
 });
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy("BrowserSession", p => p.AddAuthenticationSchemes(IdentityConstants.ApplicationScheme).RequireAuthenticatedUser())
     .AddPolicy("Planning", p => p.RequireRole(AccessRoles.Planner, AccessRoles.Administrator))
     .AddPolicy("Assessment", p => p.RequireRole(AccessRoles.Assessor, AccessRoles.Administrator))
     .AddPolicy("StaffRecords", p => p.RequireRole(AccessRoles.Planner, AccessRoles.Assessor, AccessRoles.Administrator))
@@ -55,10 +61,13 @@ builder.Services.AddRateLimiter(options => {
     options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions {
             PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.AddPolicy("token", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions {
+            PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
-builder.Services.AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddControllersWithViews().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["https://localhost:5173"])
@@ -66,11 +75,12 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(builder.Conf
 var app = builder.Build();
 
 // Explicit operator commands: normal application startup never changes schema or creates an admin.
-if (args.Contains("--migrate") || args.Contains("--bootstrap-admin"))
+if (args.Contains("--migrate") || args.Contains("--bootstrap-admin") || args.Contains("--register-mobile-client"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MuseumDbContext>();
     if (args.Contains("--migrate")) await db.Database.MigrateAsync();
+    if (args.Contains("--register-mobile-client")) await MobileAuthentication.RegisterClient(scope.ServiceProvider, builder.Configuration);
     if (args.Contains("--bootstrap-admin"))
     {
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
@@ -93,12 +103,14 @@ if (args.Contains("--migrate") || args.Contains("--bootstrap-admin"))
 app.UseExceptionHandler();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseHttpsRedirection();
+app.UseRouting();
 app.UseCors();
-app.UseAuthentication();
-app.UseAuthorization();
 app.UseRateLimiter();
+app.UseMiddleware<TokenExchangeTransactionMiddleware>();
+app.UseAuthentication();
 app.Use(async (context, next) => {
-    if (context.Request.Path.StartsWithSegments("/api")) context.Response.Headers.CacheControl = "no-store";
+    if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/mobile") || context.Request.Path.StartsWithSegments("/connect"))
+        context.Response.Headers.CacheControl = "no-store";
     if (context.User.Identity?.IsAuthenticated == true)
     {
         var users = context.RequestServices.GetRequiredService<UserManager<MuseumUser>>();
@@ -106,14 +118,34 @@ app.Use(async (context, next) => {
         var db = context.RequestServices.GetRequiredService<MuseumDbContext>();
         if (user is null || !await db.Set<Member>().AnyAsync(x => x.Id == user.Id && x.Active, context.RequestAborted))
         { context.Response.StatusCode = 401; return; }
-        if (user.MustChangePassword && !context.Request.Path.StartsWithSegments("/api/auth"))
+        if (MobileAuthentication.Enabled(builder.Configuration) && context.Request.Headers.Authorization.ToString().StartsWith("Bearer", StringComparison.OrdinalIgnoreCase))
+        {
+            var bearer = await context.AuthenticateAsync(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+            if (!bearer.Succeeded || bearer.Principal?.GetClaim(MobileAuthentication.VersionClaim) != MobileAuthentication.SessionVersion(user) ||
+                !bearer.Principal.HasScope(MobileAuthentication.ApiScope) || user.MustChangePassword || await users.IsLockedOutAsync(user))
+            { context.Response.StatusCode = 401; context.Response.Headers.WWWAuthenticate = "Bearer"; return; }
+            context.Items[MobileAuthentication.ValidBearerItem] = true;
+        }
+        if (user.MustChangePassword && !context.Request.Path.StartsWithSegments("/api/auth") &&
+            context.Request.Path != "/mobile/password" && context.Request.Path != "/mobile/login" && context.Request.Path != "/connect/authorize")
         { await Results.Problem(statusCode: 403, title: "Change your temporary password before using the application.").ExecuteAsync(context); return; }
     }
+    await next(context);
+});
+app.UseAuthorization();
+app.Use(async (context, next) => {
     if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method) && !HttpMethods.IsOptions(context.Request.Method))
     {
-        try { await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context); }
-        catch (AntiforgeryValidationException)
-        { await Results.Problem(statusCode: 400, title: "Missing or invalid CSRF token.").ExecuteAsync(context); return; }
+        // Token exchange is validated by OpenIddict (grant, exact client/redirect, PKCE).
+        // Every other write requires CSRF unless bearer authentication actually succeeded.
+        var tokenExchange = MobileAuthentication.Enabled(builder.Configuration) && context.Request.Path == "/connect/token";
+        var bearerApiWrite = context.Request.Path.StartsWithSegments("/api") && context.Items.ContainsKey(MobileAuthentication.ValidBearerItem);
+        if (!tokenExchange && !bearerApiWrite)
+        {
+            try { await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context); }
+            catch (AntiforgeryValidationException)
+            { await Results.Problem(statusCode: 400, title: "Missing or invalid CSRF token.").ExecuteAsync(context); return; }
+        }
     }
     await next(context);
 });

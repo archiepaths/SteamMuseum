@@ -51,14 +51,14 @@ public sealed class AccountService(UserManager<MuseumUser> users, SignInManager<
         await db.SaveChangesAsync(ct);
         return new AccountView(user.Id, user.Email!, member.DisplayName, true, true, await users.GetRolesAsync(user));
     }, ct);
-    public async Task ChangePassword(ClaimsPrincipal principal, string currentPassword, string newPassword)
+    public async Task ChangePassword(ClaimsPrincipal principal, string currentPassword, string newPassword, bool refreshCookie = true)
     {
         var user = await users.GetUserAsync(principal) ?? throw new BusinessException("Sign in required.", 401);
         if (currentPassword == newPassword) throw new BusinessException("Choose a different password.");
         Check(await users.ChangePasswordAsync(user, currentPassword, newPassword));
         user.MustChangePassword = false;
         Check(await users.UpdateAsync(user));
-        await signIn.RefreshSignInAsync(user);
+        if (refreshCookie) await signIn.RefreshSignInAsync(user);
     }
     public Task SetActive(Guid actor, Guid id, bool active, CancellationToken ct) => store.Write(async () => {
         if (actor == id) throw new BusinessException("You cannot deactivate your own account.");

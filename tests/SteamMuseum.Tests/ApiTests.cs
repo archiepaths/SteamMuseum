@@ -28,6 +28,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("MobileAuth:Enabled", "true");
+        builder.UseSetting("MobileAuth:Issuer", "https://localhost/");
+        builder.UseSetting("MobileAuth:ClientId", "museum-native-test");
+        builder.UseSetting("MobileAuth:RedirectUri", "org.steammuseum.staff:/oauth/callback");
         builder.ConfigureLogging(o => { o.ClearProviders(); o.AddConsole(); o.SetMinimumLevel(LogLevel.Warning); });
         builder.ConfigureServices(services => {
             services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
@@ -55,6 +59,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             db.Add(new Member { Id = id, DisplayName = email });
         }
         await db.SaveChangesAsync();
+        await SteamMuseum.Api.MobileAuthentication.RegisterClient(scope.ServiceProvider,
+            scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>());
     }
     public HttpClient Client() => CreateClient(new() { BaseAddress = new Uri("https://localhost"), HandleCookies = true, AllowAutoRedirect = false });
     public static async Task Csrf(HttpClient client)
@@ -92,6 +98,63 @@ public sealed class ApiTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.IsSuccessStatusCode, $"{response.StatusCode}: {body}");
         return JsonSerializer.Deserialize<JsonElement>(body);
+    }
+    [Fact]
+    public async Task Special_event_ranges_exclude_gaps_and_preserve_shared_responses_and_notes()
+    {
+        using var admin = factory.Client(); using var member = factory.Client();
+        await ApiFactory.Login(admin, "admin@example.test"); await ApiFactory.Login(member, "member@example.test");
+        var monthly = (await Success(await admin.PostAsJsonAsync("/api/windows", new { name = "October", kind = "Monthly", start = "2030-10-01", end = "2030-10-31", submissionDeadlineUtc = "2030-09-30T23:59:00Z" }))).GetProperty("id").GetGuid();
+        await Success(await member.PutAsJsonAsync($"/api/me/availability/{monthly}", new { maximumAssignments = 5, days = new[] {
+            new { date = "2030-10-02", status = "Available" }, new { date = "2030-10-10", status = "Available" }, new { date = "2030-10-20", status = "Available" }
+        }}));
+        var created = await Success(await admin.PostAsJsonAsync("/api/windows", new { name = "Two weekends", kind = "SpecialEvent", submissionDeadlineUtc = "2030-09-30T23:59:00Z", notes = "Meet at the station.\nBring lunch.", dateRanges = new[] {
+            new { start = "2030-10-20", end = "2030-10-21" }, new { start = "2030-10-01", end = "2030-10-02" }
+        }}));
+        var id = created.GetProperty("id").GetGuid();
+        Assert.Equal("2030-10-01", created.GetProperty("start").GetString());
+        Assert.Equal("2030-10-21", created.GetProperty("end").GetString());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MuseumDbContext>();
+            var railway = new Railway { Name = "Test railway" }; db.Add(railway);
+            foreach (var date in new[] { new DateOnly(2030, 10, 2), new DateOnly(2030, 10, 10) })
+            {
+                var duty = new Duty { Name = "Test shift", Date = date, Start = new(9, 0), End = new(12, 0), Role = DutyRole.Guard, RailwayId = railway.Id };
+                db.Add(duty); db.Add(new Assignment { DutyId = duty.Id, MemberId = factory.MemberId, Status = AssignmentStatus.Published });
+            }
+            await db.SaveChangesAsync();
+        }
+        var view = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{id}");
+        Assert.Equal(1, view.GetProperty("assigned").GetInt32());
+        Assert.Equal(2, view.GetProperty("window").GetProperty("dateRanges").GetArrayLength());
+        Assert.Equal("Meet at the station.\nBring lunch.", view.GetProperty("window").GetProperty("notes").GetString());
+        Assert.Equal(new[] { "2030-10-02", "2030-10-20" }, view.GetProperty("days").EnumerateArray().Select(d => d.GetProperty("date").GetString()));
+        Assert.Equal(HttpStatusCode.BadRequest, (await member.PutAsJsonAsync($"/api/me/availability/{id}", new { maximumAssignments = 1, days = new[] { new { date = "2030-10-10", status = "Unavailable" } } })).StatusCode);
+        var unchanged = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{monthly}");
+        Assert.All(unchanged.GetProperty("days").EnumerateArray(), d => Assert.Equal("Available", d.GetProperty("status").GetString()));
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.PutAsJsonAsync($"/api/windows/{id}/notes", new { notes = "Not allowed" })).StatusCode);
+        await Success(await admin.PutAsJsonAsync($"/api/windows/{id}/notes", new { notes = "Updated instructions" }));
+        await Success(await admin.PutAsJsonAsync($"/api/windows/{id}/state", new { open = false, deadlineUtc = "2030-09-30T23:59:00Z" }));
+        var windows = await member.GetFromJsonAsync<JsonElement>("/api/windows");
+        Assert.Equal("Updated instructions", windows.EnumerateArray().Single(w => w.GetProperty("id").GetGuid() == id).GetProperty("notes").GetString());
+        await Success(await admin.PutAsJsonAsync($"/api/windows/{id}/notes", new { notes = (string?)null }));
+        view = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{id}");
+        Assert.Equal(JsonValueKind.Null, view.GetProperty("window").GetProperty("notes").ValueKind);
+    }
+    [Fact]
+    public async Task Invalid_window_ranges_and_long_notes_are_rejected()
+    {
+        using var admin = factory.Client(); await ApiFactory.Login(admin, "admin@example.test");
+        foreach (var ranges in new object[][] {
+            [],
+            [new { start = "2030-10-02", end = "2030-10-01" }],
+            [new { start = "2030-10-01", end = "2030-10-03" }, new { start = "2030-10-03", end = "2030-10-05" }],
+            [new { start = "2030-10-01", end = "2032-10-01" }]
+        })
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/windows", new { name = "Invalid", kind = "SpecialEvent", dateRanges = ranges, submissionDeadlineUtc = "2030-09-30T23:59:00Z" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/windows", new { name = "Invalid monthly", kind = "Monthly", start = "2030-10-01", end = "2030-10-31", dateRanges = new[] { new { start = "2030-10-01", end = "2030-10-02" } }, submissionDeadlineUtc = "2030-09-30T23:59:00Z" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/windows", new { name = "Long notes", kind = "SpecialEvent", start = "2030-10-01", end = "2030-10-02", notes = new string('x', 2001), submissionDeadlineUtc = "2030-09-30T23:59:00Z" })).StatusCode);
     }
     [Fact]
     public async Task Authentication_authorization_and_csrf_are_enforced()

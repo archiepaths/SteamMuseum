@@ -64,6 +64,15 @@ public sealed class RosterRulesTests
         Assert.Single(issues); Assert.Contains("Month", issues[0]);
     }
     [Fact]
+    public void Event_limit_does_not_apply_to_a_gap_between_ranges()
+    {
+        var window = new AvailabilityWindow { Name = "Split event", Start = new(2030, 9, 28), End = new(2030, 10, 10),
+            DateRanges = [new() { Start = new(2030, 9, 28), End = new(2030, 9, 29) }, new() { Start = new(2030, 10, 9), End = new(2030, 10, 10) }] };
+        Assert.False(window.Contains(Duty().Date));
+        Assert.True(window.Contains(new(2030, 10, 9)));
+        Assert.Empty(RosterRules.Check(Duty(), member, Available(), [Qualification()], [], [(window, 0, 0)]));
+    }
+    [Fact]
     public void Zero_limit_blocks_first_shift_and_blank_limit_is_unlimited()
     {
         var window = new AvailabilityWindow { Name = "Month", Start = new(2030, 10, 1), End = new(2030, 10, 31) };

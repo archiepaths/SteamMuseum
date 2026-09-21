@@ -58,42 +58,7 @@ export default function AvailabilityPage({ planner }: { planner: boolean }) {
           <div className="split">
             <section>
               <h2>Open a new window</h2>
-              <ActionForm
-                submit="Create window"
-                onSubmit={async (f) => {
-                  await request("/windows", "POST", {
-                    name: value(f, "name"),
-                    kind: value(f, "kind"),
-                    start: value(f, "start"),
-                    end: value(f, "end"),
-                    submissionDeadlineUtc: new Date(
-                      value(f, "deadline"),
-                    ).toISOString(),
-                  });
-                  windows.reload();
-                }}
-              >
-                <Field label="Window name">
-                  <input name="name" required maxLength={150} />
-                </Field>
-                <Field label="Type">
-                  <select name="kind">
-                    <option value="Monthly">Calendar month</option>
-                    <option value="SpecialEvent">Special event</option>
-                  </select>
-                </Field>
-                <div className="fields">
-                  <Field label="First date">
-                    <input name="start" type="date" required />
-                  </Field>
-                  <Field label="Last date">
-                    <input name="end" type="date" required />
-                  </Field>
-                </div>
-                <Field label="Submission deadline (your local time)">
-                  <input name="deadline" type="datetime-local" required />
-                </Field>
-              </ActionForm>
+              <CreateWindowForm refresh={windows.reload} />
             </section>
             {resource.data && (
               <section>
@@ -129,6 +94,26 @@ export default function AvailabilityPage({ planner }: { planner: boolean }) {
                     />
                   </Field>
                 </ActionForm>
+                <ActionForm
+                  key={`${selected}-notes`}
+                  submit="Save window notes"
+                  onSubmit={async (f) => {
+                    await request(`/windows/${selected}/notes`, "PUT", {
+                      notes: value(f, "notes") || null,
+                    });
+                    windows.reload();
+                    resource.reload();
+                  }}
+                >
+                  <Field label="Window notes">
+                    <textarea
+                      name="notes"
+                      maxLength={2000}
+                      rows={5}
+                      defaultValue={resource.data.window.notes ?? ""}
+                    />
+                  </Field>
+                </ActionForm>
               </section>
             )}
           </div>
@@ -136,6 +121,117 @@ export default function AvailabilityPage({ planner }: { planner: boolean }) {
       )}
     </>
   );
+}
+export function CreateWindowForm({ refresh }: { refresh: () => void }) {
+  const [kind, setKind] = useState<Window["kind"]>("Monthly");
+  const [ranges, setRanges] = useState([{ start: "", end: "" }]);
+  function editRange(index: number, key: "start" | "end", value: string) {
+    setRanges((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, [key]: value } : r)),
+    );
+  }
+  return (
+    <ActionForm
+      submit="Create window"
+      onSubmit={async (f) => {
+        const dates = kind === "SpecialEvent" ? ranges : ranges.slice(0, 1);
+        const ordered = [...dates].sort((a, b) =>
+          a.start.localeCompare(b.start),
+        );
+        if (ordered.some((r) => !r.start || !r.end || r.start > r.end))
+          throw new Error("Choose valid start and end dates for every range.");
+        if (ordered.some((r, i) => i > 0 && r.start <= ordered[i - 1].end))
+          throw new Error("Date ranges must not overlap.");
+        await request("/windows", "POST", {
+          name: value(f, "name"),
+          kind,
+          start: ordered[0].start,
+          end: ordered[ordered.length - 1].end,
+          ...(kind === "SpecialEvent" ? { dateRanges: ordered } : {}),
+          notes: value(f, "notes") || null,
+          submissionDeadlineUtc: new Date(value(f, "deadline")).toISOString(),
+        });
+        refresh();
+      }}
+    >
+      <Field label="Window name">
+        <input name="name" required maxLength={150} />
+      </Field>
+      <Field label="Type">
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value as Window["kind"])}
+        >
+          <option value="Monthly">Calendar month</option>
+          <option value="SpecialEvent">Special event</option>
+        </select>
+      </Field>
+      {(kind === "SpecialEvent" ? ranges : ranges.slice(0, 1)).map(
+        (range, i) => (
+          <fieldset key={i} className="window-range">
+            {kind === "SpecialEvent" && <legend>Date range {i + 1}</legend>}
+            <div className="fields">
+              <Field
+                label={
+                  kind === "SpecialEvent" ? `First date ${i + 1}` : "First date"
+                }
+              >
+                <input
+                  type="date"
+                  required
+                  value={range.start}
+                  onChange={(e) => editRange(i, "start", e.target.value)}
+                />
+              </Field>
+              <Field
+                label={
+                  kind === "SpecialEvent" ? `Last date ${i + 1}` : "Last date"
+                }
+              >
+                <input
+                  type="date"
+                  required
+                  min={range.start}
+                  value={range.end}
+                  onChange={(e) => editRange(i, "end", e.target.value)}
+                />
+              </Field>
+            </div>
+            {kind === "SpecialEvent" && ranges.length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setRanges((prev) => prev.filter((_, index) => index !== i))
+                }
+              >
+                Remove date range {i + 1}
+              </button>
+            )}
+          </fieldset>
+        ),
+      )}
+      {kind === "SpecialEvent" && (
+        <button
+          type="button"
+          disabled={ranges.length >= 367}
+          onClick={() => setRanges((prev) => [...prev, { start: "", end: "" }])}
+        >
+          Add date range
+        </button>
+      )}
+      <Field label="Window notes">
+        <textarea name="notes" maxLength={2000} rows={5} />
+      </Field>
+      <Field label="Submission deadline (your local time)">
+        <input name="deadline" type="datetime-local" required />
+      </Field>
+    </ActionForm>
+  );
+}
+function windowRanges(window: Window) {
+  return window.dateRanges?.length
+    ? [...window.dateRanges].sort((a, b) => a.start.localeCompare(b.start))
+    : [{ start: window.start, end: window.end }];
 }
 function toLocalInput(iso: string) {
   const d = new Date(iso);
@@ -152,35 +248,59 @@ export function AvailabilityEditor({
 }) {
   const [days, setDays] = useState<Record<string, Day>>({});
   const [maximum, setMaximum] = useState("");
-  const [selected, setSelected] = useState(data.window.start);
-  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   useEffect(() => {
     setDays(Object.fromEntries(data.days.map((d) => [d.date, d])));
     setMaximum(
       data.maximumAssignments === null ? "" : String(data.maximumAssignments),
     );
   }, [data]);
-  const dates = datesBetween(data.window.start, data.window.end);
+  const ranges = windowRanges(data.window);
+  const dates = ranges.flatMap((range) => datesBetween(range.start, range.end));
   const closed =
     !data.window.isOpen ||
     new Date(data.window.submissionDeadlineUtc).getTime() < Date.now();
-  const day = days[selected];
-  function update(date: string, patch: Partial<Day>) {
-    setDays((prev) => ({
-      ...prev,
-      [date]: {
-        ...(prev[date] ?? {
-          date,
-          status: "Available",
-          from: null,
-          until: null,
-          preferredRole: null,
-          note: null,
-        }),
-        ...patch,
-      },
-    }));
+  const selected = selectedDates[0] ?? data.window.start;
+  const editingGroup = selectedDates.length > 1;
+  const targets = selectedDates;
+  function common<K extends keyof Day>(key: K): Day[K] | undefined {
+    const first = days[targets[0]]?.[key];
+    return targets.every((date) => days[date]?.[key] === first)
+      ? first
+      : undefined;
   }
+  const day = editingGroup
+    ? {
+        date: selected,
+        status: common("status"),
+        from: common("from"),
+        until: common("until"),
+        preferredRole: common("preferredRole"),
+        note: common("note"),
+      }
+    : selectedDates.length
+      ? days[selected]
+      : undefined;
+  function update(date: string, patch: Partial<Day>) {
+    setDays((prev) => {
+      const next = { ...prev };
+      for (const target of editingGroup ? selectedDates : [date]) {
+        next[target] = {
+          ...(prev[target] ?? {
+            date: target,
+            status: "Available",
+            from: null,
+            until: null,
+            preferredRole: null,
+            note: null,
+          }),
+          ...patch,
+        };
+      }
+      return next;
+    });
+  }
+
   const available = Object.values(days).filter(
     (d) => d.status === "Available",
   ).length;
@@ -238,7 +358,12 @@ export function AvailabilityEditor({
             <div>
               <h2>{data.window.name}</h2>
               <p>
-                {prettyDate(data.window.start)} – {prettyDate(data.window.end)}
+                {ranges
+                  .map(
+                    (range) =>
+                      `${prettyDate(range.start)} – ${prettyDate(range.end)}`,
+                  )
+                  .join("; ")}
               </p>
             </div>
             <Badge tone={closed ? "muted" : "green"}>
@@ -251,89 +376,95 @@ export function AvailabilityEditor({
               responses are shown below.
             </p>
           )}
+          {data.window.notes && (
+            <div className="notice window-notes">{data.window.notes}</div>
+          )}
           <div className="availability-layout">
             <div>
-              <fieldset className="weekday-tools" disabled={closed}>
-                <b>Usually free on the same days?</b>
-                <p>Select weekdays, then apply across this window.</p>
-                <div className="weekday-buttons">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                    (name, i) => (
-                      <label key={name}>
-                        <input
-                          type="checkbox"
-                          checked={weekdays.includes((i + 1) % 7)}
-                          onChange={(e) =>
-                            setWeekdays((prev) =>
-                              e.target.checked
-                                ? [...prev, (i + 1) % 7]
-                                : prev.filter((x) => x !== (i + 1) % 7),
-                            )
-                          }
-                        />
-                        {name}
-                      </label>
-                    ),
-                  )}
-                </div>
-                <button
-                  type="button"
-                  disabled={!weekdays.length}
-                  onClick={() =>
-                    dates
-                      .filter((d) =>
-                        weekdays.includes(new Date(`${d}T12:00:00`).getDay()),
-                      )
-                      .forEach((d) => update(d, { status: "Available" }))
-                  }
-                >
-                  Mark matching days available
-                </button>
-              </fieldset>
-              <div
-                className="calendar"
-                role="group"
-                aria-label="Availability calendar"
-              >
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((x) => (
-                  <div className="day-label" key={x}>
-                    {x}
-                  </div>
-                ))}
-                {Array.from(
-                  {
-                    length: (new Date(`${dates[0]}T12:00:00`).getDay() + 6) % 7,
-                  },
-                  (_, i) => (
-                    <span key={`pad${i}`} />
-                  ),
-                )}
-                {dates.map((date) => (
+              <fieldset className="selection-tools" disabled={closed}>
+                <p>
+                  Tap dates to select them for editing. Tap a selected date
+                  again to deselect it.
+                </p>
+                <div className="selection-actions">
+                  <button type="button" onClick={() => setSelectedDates(dates)}>
+                    Select all dates
+                  </button>
                   <button
                     type="button"
-                    key={date}
-                    aria-pressed={selected === date}
-                    aria-label={`${prettyDate(date)}, ${days[date]?.status ?? "Not responded"}`}
-                    className={`calendar-day ${days[date]?.status.toLowerCase() ?? ""} ${selected === date ? "focused" : ""}`}
-                    onClick={() => setSelected(date)}
+                    disabled={!selectedDates.length}
+                    onClick={() => setSelectedDates([])}
                   >
-                    <strong>{Number(date.slice(-2))}</strong>
-                    <small>
-                      {new Date(`${date}T12:00:00`).toLocaleDateString(
-                        "en-GB",
-                        { month: "short" },
-                      )}
-                    </small>
-                    <span>
-                      {days[date]?.status === "Available"
-                        ? "Available"
-                        : days[date]
-                          ? "Unavailable"
-                          : "No response"}
-                    </span>
+                    Clear selection
                   </button>
-                ))}
-              </div>
+                  <span role="status">
+                    {selectedDates.length} dates selected
+                  </span>
+                </div>
+              </fieldset>
+              {ranges.map((range) => (
+                <section className="calendar-range" key={range.start}>
+                  {ranges.length > 1 && (
+                    <h3>
+                      {prettyDate(range.start)} – {prettyDate(range.end)}
+                    </h3>
+                  )}
+                  <div
+                    className="calendar"
+                    role="group"
+                    aria-label={`Availability calendar ${prettyDate(range.start)} to ${prettyDate(range.end)}`}
+                  >
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+                      (x) => (
+                        <div className="day-label" key={x}>
+                          {x}
+                        </div>
+                      ),
+                    )}
+                    {Array.from(
+                      {
+                        length:
+                          (new Date(`${range.start}T12:00:00`).getDay() + 6) %
+                          7,
+                      },
+                      (_, i) => (
+                        <span key={`pad${i}`} />
+                      ),
+                    )}
+                    {datesBetween(range.start, range.end).map((date) => (
+                      <button
+                        type="button"
+                        key={date}
+                        aria-pressed={selectedDates.includes(date)}
+                        aria-label={`${prettyDate(date)}, ${days[date]?.status ?? "Not responded"}`}
+                        className={`calendar-day ${days[date]?.status.toLowerCase() ?? ""} ${selectedDates.includes(date) ? "selected" : ""}`}
+                        onClick={() => {
+                          setSelectedDates((prev) =>
+                            prev.includes(date)
+                              ? prev.filter((d) => d !== date)
+                              : [...prev, date],
+                          );
+                        }}
+                      >
+                        <strong>{Number(date.slice(-2))}</strong>
+                        <small>
+                          {new Date(`${date}T12:00:00`).toLocaleDateString(
+                            "en-GB",
+                            { month: "short" },
+                          )}
+                        </small>
+                        <span>
+                          {days[date]?.status === "Available"
+                            ? "Available"
+                            : days[date]
+                              ? "Unavailable"
+                              : "No response"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
               <div className="legend">
                 <span>● Available</span>
                 <span>○ No response</span>
@@ -341,96 +472,147 @@ export function AvailabilityEditor({
               </div>
             </div>
             <fieldset className="day-editor" disabled={closed}>
-              <p className="eyebrow">SELECTED DAY</p>
-              <h3>{prettyDate(selected)}</h3>
-              <Field label="Your response">
-                <select
-                  value={day?.status ?? ""}
-                  onChange={(e) =>
-                    update(
-                      selected,
-                      e.target.value === "Unavailable"
-                        ? {
-                            status: "Unavailable",
-                            from: null,
-                            until: null,
-                            preferredRole: null,
-                          }
-                        : { status: "Available" },
-                    )
-                  }
-                >
-                  {!day && (
-                    <option value="" disabled>
-                      Not responded
-                    </option>
-                  )}
-                  <option>Available</option>
-                  <option>Unavailable</option>
-                </select>
-              </Field>
-              {day?.status === "Available" && (
-                <>
-                  <p className="muted">
-                    Leave both times empty for all-day availability.
+              <fieldset disabled={!selectedDates.length}>
+                <p className="eyebrow">
+                  {editingGroup ? "SELECTED DATES" : "SELECTED DAY"}
+                </p>
+                <h3>
+                  {editingGroup
+                    ? `${selectedDates.length} dates selected`
+                    : selectedDates.length
+                      ? prettyDate(selected)
+                      : "Select dates to edit"}
+                </h3>
+                {editingGroup && (
+                  <p className="notice">
+                    Changes apply to every selected date. Different values are
+                    shown as mixed or blank; only fields you change are
+                    replaced. Choose Available to edit times and roles for a
+                    mixed group. Save below when finished.
                   </p>
-                  <div className="fields">
-                    <Field label="From">
-                      <input
-                        type="time"
-                        value={day.from?.slice(0, 5) ?? ""}
-                        onChange={(e) =>
-                          update(selected, {
-                            from: e.target.value
-                              ? `${e.target.value}:00`
-                              : null,
-                          })
-                        }
-                      />
-                    </Field>
-                    <Field label="Until">
-                      <input
-                        type="time"
-                        value={day.until?.slice(0, 5) ?? ""}
-                        onChange={(e) =>
-                          update(selected, {
-                            until: e.target.value
-                              ? `${e.target.value}:00`
-                              : null,
-                          })
-                        }
-                      />
-                    </Field>
-                  </div>
-                  <Field label="Preferred role">
-                    <select
-                      value={day.preferredRole ?? ""}
-                      onChange={(e) =>
-                        update(selected, {
-                          preferredRole:
-                            (e.target.value as Day["preferredRole"]) || null,
-                        })
-                      }
-                    >
-                      <option value="">Any qualified role</option>
-                      {roles.map((r) => (
-                        <option key={r} value={r}>
-                          {roleName(r)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </>
-              )}
-              {day && (
-                <Field label="Note for the planner">
-                  <textarea
-                    maxLength={500}
-                    value={day.note ?? ""}
-                    onChange={(e) => update(selected, { note: e.target.value })}
-                  />
+                )}
+                <Field label="Your response">
+                  <select
+                    value={day?.status ?? ""}
+                    onChange={(e) =>
+                      update(
+                        selected,
+                        e.target.value === "Unavailable"
+                          ? {
+                              status: "Unavailable",
+                              from: null,
+                              until: null,
+                              preferredRole: null,
+                            }
+                          : { status: "Available" },
+                      )
+                    }
+                  >
+                    {!day?.status && (
+                      <option value="" disabled>
+                        {editingGroup
+                          ? "Mixed / not responded"
+                          : "Not responded"}
+                      </option>
+                    )}
+                    <option>Available</option>
+                    <option>Unavailable</option>
+                  </select>
                 </Field>
-              )}
+                {day?.status === "Available" && (
+                  <>
+                    <p className="muted">
+                      Leave both times empty for all-day availability.
+                    </p>
+                    {editingGroup && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          update(selected, { from: null, until: null })
+                        }
+                      >
+                        Set selected dates to all day
+                      </button>
+                    )}
+                    <div className="fields">
+                      <Field label="From">
+                        <input
+                          type="time"
+                          value={day.from?.slice(0, 5) ?? ""}
+                          onChange={(e) =>
+                            update(selected, {
+                              from: e.target.value
+                                ? `${e.target.value}:00`
+                                : null,
+                            })
+                          }
+                        />
+                      </Field>
+                      <Field label="Until">
+                        <input
+                          type="time"
+                          value={day.until?.slice(0, 5) ?? ""}
+                          onChange={(e) =>
+                            update(selected, {
+                              until: e.target.value
+                                ? `${e.target.value}:00`
+                                : null,
+                            })
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <Field label="Preferred role">
+                      <select
+                        value={day.preferredRole ?? ""}
+                        onChange={(e) =>
+                          update(selected, {
+                            preferredRole:
+                              e.target.value === "any"
+                                ? null
+                                : (e.target.value as Day["preferredRole"]) ||
+                                  null,
+                          })
+                        }
+                      >
+                        <option value="">
+                          {editingGroup && common("preferredRole") === undefined
+                            ? "Mixed roles (unchanged)"
+                            : "Any qualified role"}
+                        </option>
+                        {editingGroup &&
+                          common("preferredRole") === undefined && (
+                            <option value="any">Any qualified role</option>
+                          )}
+                        {roles.map((r) => (
+                          <option key={r} value={r}>
+                            {roleName(r)}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </>
+                )}
+                {day?.status && (
+                  <Field label="Note for the planner">
+                    <textarea
+                      maxLength={500}
+                      value={day.note ?? ""}
+                      onChange={(e) =>
+                        update(selected, { note: e.target.value })
+                      }
+                    />
+                  </Field>
+                )}
+                {editingGroup && day?.status && (
+                  <button
+                    type="button"
+                    onClick={() => update(selected, { note: null })}
+                  >
+                    Clear notes on selected dates
+                  </button>
+                )}
+              </fieldset>
               <hr />
               <Field label="Maximum shifts in this window">
                 <input

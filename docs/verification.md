@@ -1,5 +1,31 @@
 # Verification record
 
+## Availability date ranges and window notes — 21 September 2026
+
+- Full backend suite against isolated SQLite databases: **39 passed**.
+- Four affected range, notes, roster and limit tests against disposable MySQL Server 26.7.0: **4 passed**, with real migrations.
+- Frontend: **19 tests passed**; production build successful.
+- EF model/migration consistency: no pending changes.
+- Coverage includes nonconsecutive event dates, gap rejection, shared responses, assignment counts and limits, notes persistence/editing/clearing, planner permissions, range validation and calendar group selection.
+- Added `AddWindowDateRangesAndNotes`; existing windows keep their original dates. No application database was migrated during this work.
+
+## Mobile authentication — 20 September 2026
+
+- Release solution build: successful, zero warnings and errors.
+- Full suite using isolated SQLite databases: **36 passed, 0 failed**.
+- Full suite using an isolated MySQL Server 26.7.0 instance on a separate loopback port: **36 passed, 0 failed**, including real migrations and concurrent refresh exchanges.
+- React frontend: **13 tests passed**, production build successful.
+- EF Core model/migration consistency: no pending changes after adding the OpenIddict tables.
+- OpenIddict: 7.7.1. Resolved EF Core runtime: 10.0.11. Connector/NET: 10.0.9.
+
+New integration tests cover discovery, signed access tokens, S256 PKCE, redirect/client/verifier rejection, hosted login and forced password-change forms, access roles and member isolation, cookie/bearer CSRF separation, refresh rotation and replay-family revocation, concurrent refreshes, code replay, account deactivation/password/role/logout revocation, and token signature/issuer/audience/expiry rejection. The original web-cookie and rostering tests run in the same suite.
+
+MySQL verification identified a provider-generated joined bulk UPDATE that could prevent replay revocation. OpenIddict's supported per-record update path is now used inside the exchange transaction, and replay/concurrency checks pass on both providers. Token subjects are bounded to the existing 36-character GUID member IDs to keep MySQL composite indexes within its limits.
+
+No real museum accounts or database records were changed. Production enablement, certificate provisioning and registration of the actual native app callback remain operator steps in the [mobile authentication guide](mobile-authentication.md). No React Native app or device-level OAuth round trip was built/tested in this change. Remote CI was not run in this session.
+
+## Original backend — 19 September 2026
+
 Verified on 19 September 2026.
 
 - Release build: successful, zero warnings and zero errors.

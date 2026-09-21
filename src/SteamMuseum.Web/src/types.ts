@@ -23,6 +23,8 @@ export interface Window {
   kind: "Monthly" | "SpecialEvent";
   start: string;
   end: string;
+  dateRanges?: { start: string; end: string }[];
+  notes?: string | null;
   submissionDeadlineUtc: string;
   isOpen: boolean;
 }

@@ -39,7 +39,17 @@ public sealed class MuseumService(IStore store, TimeProvider clock)
     }, ct);
     public Task<AvailabilityWindow> CreateWindow(Guid actor, WindowRequest request, CancellationToken ct) => Change(actor, "WindowCreated", async () => {
         Require(Enum.IsDefined(request.Kind), "Invalid window kind.");
-        Require(request.Start.Year >= 1000 && request.Start <= request.End && request.End.DayNumber - request.Start.DayNumber <= 366, "Window must cover 1 to 367 days.");
+        Require(request.DateRanges is null || request.DateRanges.Count is > 0 and <= 367, "Supply between 1 and 367 date ranges.");
+        Require(request.Kind == WindowKind.SpecialEvent || request.DateRanges is null, "Multiple date ranges are only supported for special events.");
+        var ranges = request.DateRanges ?? [new WindowDateRange { Start = request.Start, End = request.End }];
+        Require(ranges.All(r => r is not null && r.Start.Year >= 1000 && r.Start <= r.End), "Every date range must have valid dates in increasing order.");
+        ranges = ranges.OrderBy(r => r.Start).ToList();
+        var start = ranges[0].Start;
+        var end = ranges[^1].End;
+        Require(end.DayNumber - start.DayNumber <= 366, "Window must span at most 367 days.");
+        for (var i = 1; i < ranges.Count; i++)
+            Require(ranges[i].Start > ranges[i - 1].End, "Date ranges must not overlap.");
+        Require(request.Notes is null || request.Notes.Length <= 2000, "Window notes must be at most 2000 characters.");
         Require(request.SubmissionDeadlineUtc.Kind == DateTimeKind.Utc, "Submission deadline must include UTC (Z).");
         if (request.Kind == WindowKind.Monthly)
         {
@@ -47,12 +57,17 @@ public sealed class MuseumService(IStore store, TimeProvider clock)
             Require(!(await store.List<AvailabilityWindow>(x => x.Kind == WindowKind.Monthly && x.Start == request.Start, ct)).Any(), "A monthly window already exists.", 409);
         }
         var item = new AvailabilityWindow { Name = Text(request.Name, 150, "Name"), Kind = request.Kind,
-            Start = request.Start, End = request.End, SubmissionDeadlineUtc = request.SubmissionDeadlineUtc };
+            Start = start, End = end, SubmissionDeadlineUtc = request.SubmissionDeadlineUtc,
+            Notes = request.Notes?.Trim(), DateRanges = request.Kind == WindowKind.SpecialEvent ? ranges : [] };
         store.Add(item); return item;
     }, ct);
     public Task<AvailabilityWindow> SetWindowOpen(Guid actor, Guid id, bool open, DateTime deadlineUtc, CancellationToken ct) => Change(actor, "WindowStateChanged", async () => {
         Require(deadlineUtc.Kind == DateTimeKind.Utc, "Deadline must include UTC (Z).");
         var window = await Get<AvailabilityWindow>(id, ct); window.IsOpen = open; window.SubmissionDeadlineUtc = deadlineUtc; return window;
+    }, ct);
+    public Task<AvailabilityWindow> SetWindowNotes(Guid actor, Guid id, string? notes, CancellationToken ct) => Change(actor, "WindowNotesChanged", async () => {
+        Require(notes is null || notes.Length <= 2000, "Window notes must be at most 2000 characters.");
+        var window = await Get<AvailabilityWindow>(id, ct); window.Notes = notes?.Trim(); return window;
     }, ct);
     public async Task<AvailabilityView> Availability(Guid member, Guid windowId, CancellationToken ct)
     {
@@ -60,7 +75,7 @@ public sealed class MuseumService(IStore store, TimeProvider clock)
         var preference = (await store.List<WindowPreference>(x => x.MemberId == member && x.WindowId == windowId, ct)).SingleOrDefault();
         var days = await store.List<DailyAvailability>(x => x.MemberId == member && x.Date >= window.Start && x.Date <= window.End, ct);
         var duties = await AssignedDuties(member, null, ct);
-        return new(window, preference?.MaximumAssignments, duties.Count(x => window.Contains(x.Date)), days.OrderBy(x => x.Date).ToList());
+        return new(window, preference?.MaximumAssignments, duties.Count(x => window.Contains(x.Date)), days.Where(x => window.Contains(x.Date)).OrderBy(x => x.Date).ToList());
     }
     public Task<AvailabilityView> SaveAvailability(Guid member, Guid windowId, AvailabilityRequest request, CancellationToken ct) => Change(member, "AvailabilityUpdated", async () => {
         var person = await Get<Member>(member, ct); Require(person.Active, "Member is inactive.", 403);

@@ -357,31 +357,24 @@ fieldset {
   grid-template-columns: minmax(0, 1fr) 265px;
   gap: 27px;
 }
-.weekday-tools {
-  border-radius: 7px;
-  background: #f8f9f5;
-  padding: 17px;
-  margin: 3px 0 23px;
-  font-size: 12px;
+.selection-tools {
+  padding: 0 0 18px;
 }
-.weekday-tools p {
-  margin: 2px 0 13px;
-  color: #7d897e;
+.selection-tools p {
+  font-size: 13px;
 }
-.weekday-buttons {
+.selection-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 11px;
-  margin-bottom: 12px;
-}
-.weekday-buttons label {
-  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
 }
-.weekday-tools button {
-  font-size: 11px;
-  padding: 7px 10px;
+.selection-actions button {
+  font-size: 12px;
+  padding: 8px;
+}
+.selection-actions span {
+  font-size: 12px;
 }
 .calendar {
   display: grid;
@@ -433,8 +426,11 @@ fieldset {
   background: #f0f0ed;
   color: #91938b;
 }
-.calendar-day.focused {
-  outline: 2px solid #446649;
+.calendar-day.selected {
+  background: #dce9f5;
+  border-color: #285b86;
+  color: #173e60;
+  outline: 2px solid #285b86;
   outline-offset: 1px;
 }
 .legend {
@@ -835,4 +831,30 @@ footer span {
     min-width: 0;
     width: 100%;
   }
+}
+
+.calendar-day:focus-visible {
+  outline: 3px dashed #173e60;
+  outline-offset: 3px;
+}
+
+.window-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 20px;
+}
+.window-range {
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.window-range legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.calendar-range + .calendar-range {
+  margin-top: 24px;
+}
+.calendar-range h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
 }

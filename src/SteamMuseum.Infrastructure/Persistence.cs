@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using OpenIddict.EntityFrameworkCore.Models;
 using SteamMuseum.Application;
 using SteamMuseum.Domain;
 
@@ -27,11 +28,21 @@ public sealed class MuseumDbContext(DbContextOptions<MuseumDbContext> options) :
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+        b.UseOpenIddict();
+        // Subjects are the existing GUID member IDs; keep MySQL composite indexes below 3072 bytes.
+        b.Entity<OpenIddictEntityFrameworkCoreAuthorization>().Property(x => x.Subject).HasMaxLength(36);
+        b.Entity<OpenIddictEntityFrameworkCoreToken>().Property(x => x.Subject).HasMaxLength(36);
         b.Entity<Member>().Property(x => x.DisplayName).HasMaxLength(150);
         b.Entity<Member>().HasOne<MuseumUser>().WithOne().HasForeignKey<Member>(x => x.Id).OnDelete(DeleteBehavior.Restrict);
         b.Entity<Railway>().Property(x => x.Name).HasMaxLength(150);
         b.Entity<Locomotive>().Property(x => x.Name).HasMaxLength(150);
         b.Entity<AvailabilityWindow>().Property(x => x.Name).HasMaxLength(150);
+        b.Entity<AvailabilityWindow>().Property(x => x.Notes).HasMaxLength(2000);
+        b.Entity<AvailabilityWindow>().OwnsMany(x => x.DateRanges, ranges => {
+            ranges.ToTable("AvailabilityWindowDateRange");
+            ranges.WithOwner().HasForeignKey("WindowId");
+            ranges.HasKey("WindowId", nameof(WindowDateRange.Start));
+        });
         b.Entity<DailyAvailability>().HasIndex(x => new { x.MemberId, x.Date }).IsUnique();
         b.Entity<DailyAvailability>().Property(x => x.Note).HasMaxLength(500);
         b.Entity<DailyAvailability>().HasOne<Member>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);

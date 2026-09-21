@@ -1,6 +1,8 @@
 # Endpoint guide
 
-All endpoints use the `/api` prefix. JSON enums are strings. Mutating requests require the CSRF header and cookie. Unauthenticated requests receive 401, insufficient access receives 403, validation receives 400, missing resources receive 404 and business conflicts receive 409. Error responses use Problem Details. Login throttling returns 429.
+Business endpoints use the `/api` prefix. JSON enums are strings. Cookie-authenticated writes require the CSRF header and cookie; successfully validated mobile bearer requests do not. Unauthenticated requests receive 401, insufficient access receives 403, validation receives 400, missing resources receive 404 and business conflicts receive 409. Business errors use Problem Details. Login/token throttling returns 429.
+
+Native clients use `/connect/authorize` and `/connect/token` through OpenID Connect discovery. Protocol errors use OAuth error responses. See [mobile authentication](mobile-authentication.md) for PKCE, registration, token rotation and revocation. Existing browser sign-in endpoints and CSRF behavior are unchanged.
 
 ## Accounts
 
@@ -60,3 +62,28 @@ Competence creation: `{memberId,role,railwayId,locomotiveId,validFrom,validUntil
 Duty creation: `{name,date,start,end,role,railwayId,locomotiveId}`. Assignment: `{memberId}`. Publication/cancellation require no body. Roster range is limited to 93 calendar days; the audit query accepts a UTC start within the preceding 31 days.
 
 Each roster row contains `{duty,assignment,issues,preferredRole}`. Unassigned duties have a null assignment. Issues are recalculated from current records on every read. The current endpoints are intended for a single museum deployment; tenant isolation is not implemented.
+
+### Special-event ranges and window notes
+
+`POST /api/windows` accepts optional `notes` (up to 2,000 characters). Special events also accept `dateRanges`, for example:
+
+```json
+{
+  "name": "Autumn gala weekends",
+  "kind": "SpecialEvent",
+  "dateRanges": [
+    { "start": "2030-10-05", "end": "2030-10-06" },
+    { "start": "2030-10-12", "end": "2030-10-13" }
+  ],
+  "submissionDeadlineUtc": "2030-09-30T23:00:00Z",
+  "notes": "Meet at the station.\nPlease bring lunch."
+}
+```
+
+Ranges are inclusive, sorted by the server, must not overlap, and must fit within the existing 367-day window span. With `dateRanges`, the returned `start`/`end` are the earliest/latest event dates. Without it, the existing `start`/`end` request remains supported. Monthly windows continue to require one complete calendar month and do not accept `dateRanges`.
+
+Gap dates are excluded from the calendar, availability reads/writes and event assignment counts/limits. Daily responses still remain shared with overlapping windows. Existing windows retain their original consecutive dates.
+
+Planners can update or clear notes with `PUT /api/windows/{id}/notes` and `{ "notes": "Updated instructions" }` (use null or an empty string to clear). Notes appear above the availability calendar and preserve line breaks. The existing state/deadline endpoint preserves notes.
+
+Apply the `AddWindowDateRangesAndNotes` migration before running this version against an existing database, using the migration command in the README. It adds a nullable notes column and a date-range table; it does not change existing responses.
