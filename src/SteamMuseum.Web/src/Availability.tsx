@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { DayPicker } from "@daypicker/react";
+import "@daypicker/react/style.css";
 import { CalendarDays, Check, Clock3 } from "lucide-react";
 import { request } from "./api";
 import { datesBetween, prettyDate, roleName } from "./dates";
@@ -123,6 +125,7 @@ export default function AvailabilityPage({ planner }: { planner: boolean }) {
   );
 }
 export function CreateWindowForm({ refresh }: { refresh: () => void }) {
+  const [month, setMonth] = useState("");
   const [kind, setKind] = useState<Window["kind"]>("Monthly");
   const [ranges, setRanges] = useState([{ start: "", end: "" }]);
   function editRange(index: number, key: "start" | "end", value: string) {
@@ -134,7 +137,17 @@ export function CreateWindowForm({ refresh }: { refresh: () => void }) {
     <ActionForm
       submit="Create window"
       onSubmit={async (f) => {
-        const dates = kind === "SpecialEvent" ? ranges : ranges.slice(0, 1);
+        const dates =
+          kind === "SpecialEvent"
+            ? ranges
+            : [
+                {
+                  start: month ? `${month}-01` : "",
+                  end: month
+                    ? `${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()}`
+                    : "",
+                },
+              ];
         const ordered = [...dates].sort((a, b) =>
           a.start.localeCompare(b.start),
         );
@@ -166,50 +179,73 @@ export function CreateWindowForm({ refresh }: { refresh: () => void }) {
           <option value="SpecialEvent">Special event</option>
         </select>
       </Field>
-      {(kind === "SpecialEvent" ? ranges : ranges.slice(0, 1)).map(
-        (range, i) => (
-          <fieldset key={i} className="window-range">
-            {kind === "SpecialEvent" && <legend>Date range {i + 1}</legend>}
-            <div className="fields">
-              <Field
-                label={
-                  kind === "SpecialEvent" ? `First date ${i + 1}` : "First date"
-                }
-              >
-                <input
-                  type="date"
-                  required
-                  value={range.start}
-                  onChange={(e) => editRange(i, "start", e.target.value)}
-                />
-              </Field>
-              <Field
-                label={
-                  kind === "SpecialEvent" ? `Last date ${i + 1}` : "Last date"
-                }
-              >
-                <input
-                  type="date"
-                  required
-                  min={range.start}
-                  value={range.end}
-                  onChange={(e) => editRange(i, "end", e.target.value)}
-                />
-              </Field>
-            </div>
-            {kind === "SpecialEvent" && ranges.length > 1 && (
-              <button
-                type="button"
-                onClick={() =>
-                  setRanges((prev) => prev.filter((_, index) => index !== i))
-                }
-              >
-                Remove date range {i + 1}
-              </button>
-            )}
-          </fieldset>
-        ),
+      {kind === "Monthly" && (
+        <Field label="Calendar month">
+          <input
+            type="month"
+            required
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
+        </Field>
       )}
+      {(kind === "SpecialEvent" ? ranges : []).map((range, i) => (
+        <fieldset key={i} className="window-range">
+          {kind === "SpecialEvent" && <legend>Date range {i + 1}</legend>}
+          <details className="range-picker">
+            <summary>Choose dates on calendar</summary>
+            <p>
+              Choose the first and last day. For one day, choose the same date
+              twice.
+            </p>
+            <WindowRangePicker
+              range={range}
+              onChange={(next) =>
+                setRanges((prev) =>
+                  prev.map((r, index) => (index === i ? next : r)),
+                )
+              }
+            />
+          </details>
+          <div className="fields">
+            <Field
+              label={
+                kind === "SpecialEvent" ? `First date ${i + 1}` : "First date"
+              }
+            >
+              <input
+                type="date"
+                required
+                value={range.start}
+                onChange={(e) => editRange(i, "start", e.target.value)}
+              />
+            </Field>
+            <Field
+              label={
+                kind === "SpecialEvent" ? `Last date ${i + 1}` : "Last date"
+              }
+            >
+              <input
+                type="date"
+                required
+                min={range.start}
+                value={range.end}
+                onChange={(e) => editRange(i, "end", e.target.value)}
+              />
+            </Field>
+          </div>
+          {kind === "SpecialEvent" && ranges.length > 1 && (
+            <button
+              type="button"
+              onClick={() =>
+                setRanges((prev) => prev.filter((_, index) => index !== i))
+              }
+            >
+              Remove date range {i + 1}
+            </button>
+          )}
+        </fieldset>
+      ))}
       {kind === "SpecialEvent" && (
         <button
           type="button"
@@ -227,6 +263,47 @@ export function CreateWindowForm({ refresh }: { refresh: () => void }) {
       </Field>
     </ActionForm>
   );
+}
+function WindowRangePicker({
+  range,
+  onChange,
+}: {
+  range: { start: string; end: string };
+  onChange: (range: { start: string; end: string }) => void;
+}) {
+  const [month, setMonth] = useState(() =>
+    range.start ? new Date(`${range.start}T12:00:00`) : new Date(),
+  );
+  useEffect(() => {
+    if (range.start) setMonth(new Date(`${range.start}T12:00:00`));
+  }, [range.start]);
+  return (
+    <DayPicker
+      mode="range"
+      resetOnSelect
+      weekStartsOn={1}
+      month={month}
+      onMonthChange={setMonth}
+      selected={
+        range.start
+          ? {
+              from: new Date(`${range.start}T12:00:00`),
+              to: range.end ? new Date(`${range.end}T12:00:00`) : undefined,
+            }
+          : undefined
+      }
+      onSelect={(selection) =>
+        onChange({
+          start: localDate(selection?.from),
+          end: localDate(selection?.to),
+        })
+      }
+    />
+  );
+}
+function localDate(date: Date | undefined) {
+  if (!date) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 function windowRanges(window: Window) {
   return window.dateRanges?.length

@@ -123,11 +123,11 @@ small,
   color: #91ada0;
   padding: 0 14px;
 }
-nav {
+.sidebar nav {
   display: grid;
   gap: 7px;
 }
-nav button {
+.sidebar nav button {
   background: transparent;
   border: 0;
   color: #bdcfc5;
@@ -136,12 +136,12 @@ nav button {
   font-weight: 500;
   text-align: left;
 }
-nav button:hover,
-nav button.selected {
+.sidebar nav button:hover,
+.sidebar nav button.selected {
   background: #2b5146;
   color: #fff;
 }
-nav button.selected {
+.sidebar nav button.selected {
   box-shadow: inset 3px 0 #dbbb77;
 }
 .sidebar-bottom {
@@ -646,11 +646,11 @@ footer span {
 }
 .collapsed .brand span,
 .collapsed .nav-caption,
-.collapsed nav button span,
+.collapsed .sidebar nav button span,
 .collapsed .sidebar-bottom {
   display: none;
 }
-.collapsed nav button {
+.collapsed .sidebar nav button {
   justify-content: center;
   padding: 14px;
 }
@@ -724,24 +724,24 @@ footer span {
   .sidebar-bottom {
     display: none;
   }
-  nav {
+  .sidebar nav {
     display: flex;
     overflow-x: auto;
     gap: 6px;
   }
-  nav button {
+  .sidebar nav button {
     flex-shrink: 0;
     font-size: 11px;
     padding: 9px;
   }
   .collapsed .brand,
-  .collapsed nav {
+  .collapsed .sidebar nav {
     display: none;
   }
   .collapsed .sidebar {
     padding: 0;
   }
-  .collapsed nav button span {
+  .collapsed .sidebar nav button span {
     display: inline;
   }
   .topbar {
@@ -857,4 +857,88 @@ footer span {
 .calendar-range h3 {
   font-size: 14px;
   margin-bottom: 12px;
+}
+
+.museum-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3251 / 1058;
+  object-fit: contain;
+}
+.brand {
+  margin-left: 0;
+  margin-right: 0;
+}
+.auth-logo {
+  max-width: 360px;
+}
+.collapsed .brand {
+  margin-left: 0;
+  margin-right: 0;
+}
+@media (max-width: 700px) {
+  .brand .museum-logo {
+    width: 180px;
+    max-width: 100%;
+  }
+  .auth-logo {
+    width: 240px;
+    max-width: 100%;
+  }
+}
+
+.range-picker {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f8f9f5;
+  border: 1px solid #dce4d9;
+  border-radius: 8px;
+}
+.range-picker summary {
+  cursor: pointer;
+  color: #173e35;
+  font-weight: 600;
+}
+.range-picker p {
+  font-size: 12px;
+}
+.range-picker .rdp-root {
+  --rdp-accent-color: #285b49;
+  --rdp-accent-background-color: #eaf3e8;
+  --rdp-range_middle-background-color: #eaf3e8;
+  --rdp-range_middle-color: #173e35;
+  --rdp-range_start-background: #285b49;
+  --rdp-range_end-background: #285b49;
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  font-family: inherit;
+  margin: 12px auto;
+}
+.range-picker .rdp-root button {
+  padding: 0;
+  justify-content: center;
+  box-shadow: none;
+}
+.range-picker .rdp-day_button {
+  border-radius: 6px;
+}
+.range-picker .rdp-month_grid {
+  width: auto;
+}
+.range-picker .rdp-month_grid th,
+.range-picker .rdp-month_grid td {
+  padding: 0;
+  border: 0;
+}
+@media (max-width: 400px) {
+  .range-picker {
+    padding: 6px;
+  }
+  .range-picker .rdp-root {
+    --rdp-day-width: 34px;
+    --rdp-day_button-width: 32px;
+  }
 }

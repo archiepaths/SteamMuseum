@@ -4,7 +4,6 @@ import {
   ClipboardList,
   ShieldCheck,
   Users,
-  TrainFront,
   LogOut,
   KeyRound,
   PanelLeftClose,
@@ -16,6 +15,7 @@ import AvailabilityPage from "./Availability";
 import RosterPage from "./Roster";
 import RecordsPage from "./Records";
 import Administration from "./Administration";
+import museumLogo from "./img/logo.svg";
 
 export default function App() {
   const [user, setUser] = useState<Account | null>(null);
@@ -54,7 +54,11 @@ export default function App() {
     return (
       <div className="auth">
         <div className="auth-brand">
-          <TrainFront size={44} />
+          <img
+            className="museum-logo auth-logo"
+            src={museumLogo}
+            alt="Bressingham Steam Museum"
+          />
           <p className="eyebrow">STEAM MUSEUM</p>
           <h1>
             Keeping our
@@ -132,12 +136,11 @@ export default function App() {
     <div className={`shell ${collapsed ? "collapsed" : ""}`}>
       <aside className="sidebar">
         <div className="brand">
-          <TrainFront size={30} />
-          <span>
-            STEAM
-            <br />
-            <b>MUSEUM</b>
-          </span>
+          <img
+            className="museum-logo"
+            src={museumLogo}
+            alt="Bressingham Steam Museum"
+          />
         </div>
         <p className="nav-caption">STAFF ROOM</p>
         <nav aria-label="Main navigation">

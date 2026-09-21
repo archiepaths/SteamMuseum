@@ -303,6 +303,56 @@ describe("availability workflow", () => {
       ),
     );
   });
+  it("selects a range from the calendar and keeps the date fields in sync", () => {
+    render(<CreateWindowForm refresh={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Type"), {
+      target: { value: "SpecialEvent" },
+    });
+    fireEvent.change(screen.getByLabelText("First date 1"), {
+      target: { value: "2099-01-05" },
+    });
+    fireEvent.click(screen.getByText("Choose dates on calendar"));
+    fireEvent.click(screen.getByRole("button", { name: /January 10/ }));
+    expect(
+      (screen.getByLabelText("First date 1") as HTMLInputElement).value,
+    ).toBe("2099-01-05");
+    expect(
+      (screen.getByLabelText("Last date 1") as HTMLInputElement).value,
+    ).toBe("2099-01-10");
+    fireEvent.click(screen.getByRole("button", { name: /January 15/ }));
+    fireEvent.click(screen.getByRole("button", { name: /January 15/ }));
+    expect(
+      (screen.getByLabelText("First date 1") as HTMLInputElement).value,
+    ).toBe("2099-01-15");
+    expect(
+      (screen.getByLabelText("Last date 1") as HTMLInputElement).value,
+    ).toBe("2099-01-15");
+  });
+  it("uses the whole calendar month including leap day", async () => {
+    render(<CreateWindowForm refresh={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Window name"), {
+      target: { value: "February" },
+    });
+    fireEvent.change(screen.getByLabelText("Calendar month"), {
+      target: { value: "2028-02" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Submission deadline (your local time)"),
+      { target: { value: "2028-01-31T12:00" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create window" }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/windows",
+        "POST",
+        expect.objectContaining({
+          kind: "Monthly",
+          start: "2028-02-01",
+          end: "2028-02-29",
+        }),
+      ),
+    );
+  });
   it("generates operating dates across leap days and daylight-saving changes", () => {
     expect(datesBetween("2028-02-28", "2028-03-01")).toEqual([
       "2028-02-28",
