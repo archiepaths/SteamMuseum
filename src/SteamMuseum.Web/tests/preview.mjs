@@ -93,18 +93,46 @@ const server = http.createServer(async (req, res) => {
       if (route === "/locomotives")
         return json([{ id: "locomotive", name: "No. 7 — Pioneer" }]);
       if (route === "/members") return json([member]);
-      if (route.endsWith("/competences"))
+      if (route === "/competence-elements")
         return json([
           {
-            id: "competence",
-            role: "Guard",
+            id: "safety",
+            name: "Track safety",
+            description: "Safe working",
+            learningType: "TheoryAndPractical",
+            reassessmentMonths: 12,
+            active: true,
+          },
+        ]);
+      if (route === "/competence-roles")
+        return json([
+          {
+            id: "guard",
+            name: "Museum guard",
+            category: "Guard",
             railwayId: "railway",
             locomotiveId: null,
-            validFrom: "2026-01-01",
-            validUntil: "2027-01-01",
-            evidence: "Synthetic assessment record for browser verification.",
-            revokedAtUtc: null,
-            revocationReason: null,
+            baseRoleId: null,
+            active: true,
+            requirements: [{ elementId: "safety" }],
+          },
+        ]);
+      if (route.endsWith("/element-assessments")) return json([]);
+      if (route.endsWith("/role-eligibility"))
+        return json([
+          {
+            roleId: "guard",
+            name: "Museum guard",
+            qualified: false,
+            elements: [
+              {
+                elementId: "safety",
+                name: "Track safety",
+                status: "Not assessed",
+                reassessmentDue: null,
+              },
+            ],
+            issues: ["Track safety: Not assessed."],
           },
         ]);
       if (route.endsWith("/roster"))

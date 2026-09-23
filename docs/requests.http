@@ -68,19 +68,33 @@ X-CSRF-TOKEN: {{csrf}}
 
 {"name":"Locomotive A"}
 
-### Record an assessed competence (assessor)
-POST {{base}}/api/competences
+### Define element (assessor); set elementId to the returned id
+POST {{base}}/api/competence-elements
 Content-Type: application/json
 X-CSRF-TOKEN: {{csrf}}
 
-{"memberId":"{{memberId}}","role":"Driver","railwayId":"{{railwayId}}","locomotiveId":"{{locomotiveId}}","validFrom":"2030-01-01","validUntil":"2030-12-31","evidence":"Practical assessment completed; reference AS-001"}
+{"name":"Railway A driving","description":"Theory and practical driving assessment","learningType":"TheoryAndPractical","reassessmentMonths":12}
+
+### Define role (assessor); set competenceRoleId to the returned id
+POST {{base}}/api/competence-roles
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"name":"Railway A driver","category":"Driver","railwayId":"{{railwayId}}","locomotiveId":"{{locomotiveId}}","elementIds":["{{elementId}}"]}
+
+### Record assessment (assessor); use an actual past/current assessment date
+POST {{base}}/api/element-assessments
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrf}}
+
+{"memberId":"{{memberId}}","elementId":"{{elementId}}","outcome":"Competent","assessedOn":"2026-09-23","evidence":"Practical assessment completed; reference AS-001"}
 
 ### Create a single-role duty (planner)
 POST {{base}}/api/duties
 Content-Type: application/json
 X-CSRF-TOKEN: {{csrf}}
 
-{"name":"Operating day driver","date":"2030-10-07","start":"09:00:00","end":"17:00:00","role":"Driver","railwayId":"{{railwayId}}","locomotiveId":"{{locomotiveId}}"}
+{"name":"Operating day driver","competenceRoleId":"{{competenceRoleId}}","date":"2030-10-07","start":"09:00:00","end":"17:00:00","role":"Driver","railwayId":"{{railwayId}}","locomotiveId":"{{locomotiveId}}"}
 
 ### Assign qualified, available member (planner)
 POST {{base}}/api/duties/{{dutyId}}/assignment

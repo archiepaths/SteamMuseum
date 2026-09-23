@@ -21,10 +21,12 @@ public sealed class ConcurrencyTests
             var railway = await service.CreateRailway(factory.AdminId, "Railway", ct);
             var loco = await service.CreateLocomotive(factory.AdminId, "Loco", ct);
             var window = await service.CreateWindow(factory.AdminId, new("Month", WindowKind.Monthly, new(2030, 10, 1), new(2030, 10, 31), new(2030, 9, 30, 23, 0, 0, DateTimeKind.Utc)), ct);
-            await service.RecordCompetence(factory.AdminId, new(factory.MemberId, DutyRole.Driver, railway.Id, loco.Id, new(2030, 1, 1), null, "Assessment"), ct);
+            var element = await service.SaveElement(factory.AdminId, null, new("Driving", "Practical", LearningType.Practical, 120), ct);
+            var role = await service.SaveCompetenceRole(factory.AdminId, null, new("Driver", null, DutyRole.Driver, railway.Id, loco.Id, [element.Id]), ct);
+            await service.AssessElement(factory.AdminId, new(factory.MemberId, element.Id, AssessmentOutcome.Competent, DateOnly.FromDateTime(DateTime.UtcNow), "Assessment"), ct);
             await service.SaveAvailability(factory.MemberId, window.Id, new(1, [new(new(2030, 10, 1), AvailabilityStatus.Available, null, null, null, null), new(new(2030, 10, 2), AvailabilityStatus.Available, null, null, null, null)]), ct);
-            first = (await service.CreateDuty(factory.AdminId, new("First", new(2030, 10, 1), new(10, 0), new(16, 0), DutyRole.Driver, railway.Id, loco.Id), ct)).Id;
-            second = (await service.CreateDuty(factory.AdminId, new("Second", new(2030, 10, 2), new(10, 0), new(16, 0), DutyRole.Driver, railway.Id, loco.Id), ct)).Id;
+            first = (await service.CreateDuty(factory.AdminId, new("First", new(2030, 10, 1), new(10, 0), new(16, 0), DutyRole.Driver, railway.Id, loco.Id, role.Id), ct)).Id;
+            second = (await service.CreateDuty(factory.AdminId, new("Second", new(2030, 10, 2), new(10, 0), new(16, 0), DutyRole.Driver, railway.Id, loco.Id, role.Id), ct)).Id;
         }
         using var plannerA = factory.Client(); using var plannerB = factory.Client();
         await ApiFactory.Login(plannerA, "admin@example.test"); await ApiFactory.Login(plannerB, "admin@example.test");

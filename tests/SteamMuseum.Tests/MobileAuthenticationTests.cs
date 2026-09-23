@@ -94,7 +94,7 @@ public sealed class MobileAuthenticationTests : IAsyncLifetime
         Assert.Equal(factory.MemberId, me.GetProperty("id").GetGuid());
         Assert.Equal(HttpStatusCode.OK, (await native.GetAsync("/api/windows")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await native.GetAsync("/api/members")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await native.GetAsync($"/api/members/{factory.OtherId}/competences")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await native.GetAsync($"/api/members/{factory.OtherId}/element-assessments")).StatusCode);
         using var idTokenClient = Bearer(tokens.GetProperty("id_token").GetString()!);
         Assert.Equal(HttpStatusCode.Unauthorized, (await idTokenClient.GetAsync("/api/windows")).StatusCode);
     }

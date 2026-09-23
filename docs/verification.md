@@ -1,5 +1,23 @@
 # Verification record
 
+## Legacy qualification retirement — 23 September 2026
+
+- Backend suite: **37 passed**, after replacing obsolete qualification tests with element-based checks. The MySQL-only archive assertion is exercised in the separate provider run below.
+- Targeted MySQL suite: **7 passed**, including archival migration up/down preservation, removed endpoints, unlinked-duty rejection, element-based roster workflow and concurrent shift limits.
+- Frontend: **24 passed**, production build successful. EF reports no pending model changes.
+- SQLite test factories now disable pooling instead of clearing every factory's pool, fixing a parallel-test disposal race found during verification.
+- `RetireLegacyCompetence` preserves old evidence by renaming the table to `ArchivedCompetence`; the application has no legacy entity, routes, screens or authorization fallback. Existing duties require a linked competence role before assignment/publication.
+- No migration was applied to the user's application database.
+
+## Competence elements and roles — 23 September 2026
+
+- Release backend suite against isolated SQLite databases: **42 passed**. The three element-competence tests were rerun successfully after the final requirement-edit validation changes.
+- Four affected competence and existing roster tests against disposable MySQL Server 26.7.0: **4 passed**, including real migrations and persisted inherited requirements.
+- Frontend: **24 tests passed**; production build successful.
+- EF model/migration consistency: no pending changes.
+- Checks cover base/variant requirements, per-member isolation, due dates, failed/revoked reassessments, inactive roles/elements, inherited edits, preserved assessment periods, assignment/publication rejection, catalogue permissions and duty scope submission.
+- No existing application database was migrated and no real assessment records were created. Existing development API process was left running; Release outputs were used to avoid its locked Debug files.
+
 ## Availability date ranges and window notes — 21 September 2026
 
 - Full backend suite against isolated SQLite databases: **39 passed**.

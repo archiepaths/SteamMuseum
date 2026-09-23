@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SteamMuseum.Infrastructure;
 
@@ -10,9 +11,11 @@ using SteamMuseum.Infrastructure;
 namespace SteamMuseum.Infrastructure.Migrations
 {
     [DbContext(typeof(MuseumDbContext))]
-    partial class MuseumDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923154343_AddElementCompetenceAndRoles")]
+    partial class AddElementCompetenceAndRoles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -439,6 +442,61 @@ namespace SteamMuseum.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("AvailabilityWindow");
+                });
+
+            modelBuilder.Entity("SteamMuseum.Domain.Competence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AssessedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Evidence")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<Guid?>("LocomotiveId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("RailwayId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("ValidUntil")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssessedBy");
+
+                    b.HasIndex("LocomotiveId");
+
+                    b.HasIndex("RailwayId");
+
+                    b.HasIndex("MemberId", "Role", "RailwayId");
+
+                    b.ToTable("Competence");
                 });
 
             modelBuilder.Entity("SteamMuseum.Domain.CompetenceElement", b =>
@@ -954,6 +1012,32 @@ namespace SteamMuseum.Infrastructure.Migrations
                         });
 
                     b.Navigation("DateRanges");
+                });
+
+            modelBuilder.Entity("SteamMuseum.Domain.Competence", b =>
+                {
+                    b.HasOne("SteamMuseum.Domain.Member", null)
+                        .WithMany()
+                        .HasForeignKey("AssessedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SteamMuseum.Domain.Locomotive", null)
+                        .WithMany()
+                        .HasForeignKey("LocomotiveId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SteamMuseum.Domain.Member", null)
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SteamMuseum.Domain.Railway", null)
+                        .WithMany()
+                        .HasForeignKey("RailwayId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SteamMuseum.Domain.CompetenceRole", b =>

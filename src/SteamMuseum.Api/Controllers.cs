@@ -64,14 +64,6 @@ public sealed class MuseumController(MuseumService museum) : ControllerBase
     public async Task<IActionResult> Locomotives(CancellationToken ct) => Ok(await museum.Locomotives(ct));
     [HttpPost("locomotives"), Authorize(Policy = "Administration")]
     public async Task<IActionResult> CreateLocomotive(NameRequest request, CancellationToken ct) => Ok(await museum.CreateLocomotive(Actor, request.Name, ct));
-    [HttpGet("me/competences")]
-    public async Task<IActionResult> MyCompetences(CancellationToken ct) => Ok(await museum.Competences(Actor, ct));
-    [HttpGet("members/{memberId:guid}/competences"), Authorize(Policy = "StaffRecords")]
-    public async Task<IActionResult> Competences(Guid memberId, CancellationToken ct) => Ok(await museum.Competences(memberId, ct));
-    [HttpPost("competences"), Authorize(Policy = "Assessment")]
-    public async Task<IActionResult> RecordCompetence(CompetenceRequest request, CancellationToken ct) => Ok(await museum.RecordCompetence(Actor, request, ct));
-    [HttpPost("competences/{id:guid}/revoke"), Authorize(Policy = "Assessment")]
-    public async Task<IActionResult> Revoke(Guid id, ReasonRequest request, CancellationToken ct) => Ok(await museum.RevokeCompetence(Actor, id, request.Reason, ct));
     [HttpGet("me/training")]
     public async Task<IActionResult> MyTraining(CancellationToken ct) => Ok(await museum.Training(Actor, ct));
     [HttpGet("members/{memberId:guid}/training"), Authorize(Policy = "StaffRecords")]

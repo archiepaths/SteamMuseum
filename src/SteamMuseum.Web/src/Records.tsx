@@ -1,25 +1,9 @@
 import { useState } from "react";
 import { request } from "./api";
-import { localDate, prettyDate, roleName } from "./dates";
-import { DutyFields } from "./Roster";
-import type {
-  Availability,
-  Competence,
-  Member,
-  Reference,
-  Training,
-  Window,
-} from "./types";
-import {
-  ActionForm,
-  Badge,
-  Empty,
-  Field,
-  Status,
-  nullable,
-  useResource,
-  value,
-} from "./ui";
+import { prettyDate, roleName } from "./dates";
+import ElementRecords from "./ElementRecords";
+import type { Availability, Member, Training, Window } from "./types";
+import { ActionForm, Empty, Field, Status, useResource, value } from "./ui";
 
 export default function RecordsPage({
   staff,
@@ -34,14 +18,9 @@ export default function RecordsPage({
   const [memberId, setMemberId] = useState("");
   const selected = memberId || members.data?.[0]?.id || "";
   const prefix = staff ? (selected ? `/members/${selected}` : null) : "/me";
-  const competences = useResource<Competence[]>(
-    prefix ? `${prefix}/competences` : null,
-  );
   const training = useResource<Training[]>(
     prefix ? `${prefix}/training` : null,
   );
-  const railways = useResource<Reference[]>("/railways");
-  const locomotives = useResource<Reference[]>("/locomotives");
   return (
     <>
       <p className="intro">
@@ -67,110 +46,15 @@ export default function RecordsPage({
           {members.data?.length === 0 && <Empty>No staff records yet.</Empty>}
         </>
       )}
-      {[competences, training, railways, locomotives].map((r, i) => (
+      {[training].map((r, i) => (
         <Status key={i} resource={r} />
       ))}
-      <div className="section-heading">
-        <h2>Competence record</h2>
-        <span className="muted">
-          Training alone does not qualify a member for duties.
-        </span>
-      </div>
-      {competences.data?.length === 0 && (
-        <Empty>No assessed qualifications recorded.</Empty>
-      )}
-      <div className="record-grid">
-        {competences.data?.map((c) => {
-          const status = c.revokedAtUtc
-            ? "Revoked"
-            : c.validFrom > localDate()
-              ? "Not yet valid"
-              : c.validUntil && c.validUntil < localDate()
-                ? "Expired"
-                : "Valid";
-          return (
-            <section className="card" key={c.id}>
-              <div className="section-heading">
-                <h3>{roleName(c.role)}</h3>
-                <Badge tone={status === "Valid" ? "green" : ""}>{status}</Badge>
-              </div>
-              <p>
-                {railways.data?.find((r) => r.id === c.railwayId)?.name ??
-                  c.railwayId}{" "}
-                ·{" "}
-                {c.locomotiveId
-                  ? (locomotives.data?.find((l) => l.id === c.locomotiveId)
-                      ?.name ?? c.locomotiveId)
-                  : "Railway-wide"}
-              </p>
-              <p className="muted">
-                {prettyDate(c.validFrom)} –{" "}
-                {c.validUntil ? prettyDate(c.validUntil) : "No expiry"}
-              </p>
-              <p className="preserve">{c.evidence}</p>
-              {c.revocationReason && (
-                <p className="error">{c.revocationReason}</p>
-              )}
-              {staff && assessor && !c.revokedAtUtc && (
-                <details>
-                  <summary>Revoke qualification</summary>
-                  <ActionForm
-                    submit="Record revocation"
-                    onSubmit={async (f) => {
-                      await request(`/competences/${c.id}/revoke`, "POST", {
-                        reason: value(f, "reason"),
-                      });
-                      competences.reload();
-                    }}
-                  >
-                    <Field label="Reason for revocation">
-                      <textarea name="reason" required maxLength={500} />
-                    </Field>
-                  </ActionForm>
-                </details>
-              )}
-            </section>
-          );
-        })}
-      </div>
-      {staff && assessor && selected && (
-        <details className="card">
-          <summary>Record an assessed qualification</summary>
-          <ActionForm
-            key={selected}
-            submit="Record qualification"
-            onSubmit={async (f) => {
-              await request("/competences", "POST", {
-                memberId: selected,
-                role: value(f, "role"),
-                railwayId: value(f, "railwayId"),
-                locomotiveId: nullable(f, "locomotiveId"),
-                validFrom: value(f, "validFrom"),
-                validUntil: nullable(f, "validUntil"),
-                evidence: value(f, "evidence"),
-              });
-              competences.reload();
-            }}
-          >
-            <DutyFields
-              competence
-              railways={railways.data ?? []}
-              locomotives={locomotives.data ?? []}
-            />
-            <div className="fields">
-              <Field label="Valid from">
-                <input type="date" name="validFrom" required />
-              </Field>
-              <Field label="Valid until (optional)">
-                <input type="date" name="validUntil" />
-              </Field>
-            </div>
-            <Field label="Assessment evidence">
-              <textarea name="evidence" required maxLength={2000} />
-            </Field>
-          </ActionForm>
-        </details>
-      )}
+      <ElementRecords
+        key={prefix}
+        prefix={prefix}
+        memberId={selected}
+        manage={staff && assessor}
+      />
       {staff && planner && selected && (
         <MemberAvailability key={selected} memberId={selected} />
       )}

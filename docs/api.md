@@ -39,13 +39,13 @@ Availability writes: `{maximumAssignments,days:[{date,status,from,until,preferre
 
 | Method | Route | Access |
 |---|---|---|
-| GET | `/me/competences`, `/me/training` | Own records only |
-| GET | `/members/{memberId}/competences`, `/members/{memberId}/training` | Planner, Assessor or Administrator |
-| POST | `/competences` | Assessor or Administrator |
-| POST | `/competences/{id}/revoke` | Assessor or Administrator |
+| GET | `/me/element-assessments`, `/me/training` | Own records only |
+| GET | `/members/{memberId}/element-assessments`, `/members/{memberId}/training` | Planner, Assessor or Administrator |
+| POST | `/element-assessments` | Assessor or Administrator |
+| POST | `/element-assessments/{id}/revoke` | Assessor or Administrator |
 | POST | `/training` | Assessor or Administrator |
 
-Competence creation: `{memberId,role,railwayId,locomotiveId,validFrom,validUntil,evidence}`. `validUntil` and, for non-driving roles, `locomotiveId` may be null. Revoke: `{reason}`. Training: `{memberId,date,notes}`. Roles: `Driver`, `Guard`, `Fireman`, `StationStaff`. These operating roles are distinct from account access roles.
+Assessment creation: `{memberId,elementId,outcome,assessedOn,evidence}`. Outcomes are `Competent` or `NotCompetent`; the reassessment due date is calculated from the element's period. Revoke: `{reason}`. Training: `{memberId,date,notes}`. Duties require `competenceRoleId` in addition to their operating scope. See the competence workflow guide below for element and role catalogue endpoints.
 
 ## Rostering
 
@@ -87,3 +87,7 @@ Gap dates are excluded from the calendar, availability reads/writes and event as
 Planners can update or clear notes with `PUT /api/windows/{id}/notes` and `{ "notes": "Updated instructions" }` (use null or an empty string to clear). Notes appear above the availability calendar and preserve line breaks. The existing state/deadline endpoint preserves notes.
 
 Apply the `AddWindowDateRangesAndNotes` migration before running this version against an existing database, using the migration command in the README. It adds a nullable notes column and a date-range table; it does not change existing responses.
+
+## Competence elements and roles
+
+See [the competence workflow and API guide](competence-elements.md) for element assessment, reassessment, inherited role requirements and the migration from legacy qualifications.

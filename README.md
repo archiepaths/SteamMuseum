@@ -9,7 +9,7 @@ A staff application for availability, competence records and rostering, built wi
 - Member, Planner, Assessor and Administrator access roles. Roles can be combined; changing roles revokes existing sessions.
 - Monthly and special-event availability windows, deadlines and open/close controls.
 - Whole-day or time-limited availability, optional preferred role, notes and maximum assignments per window.
-- Qualification history scoped to role, railway and, where applicable, locomotive. Append-only training records and assessed qualifications, with recorded revocations.
+- Element assessments and reassessments with recorded outcomes and due dates. Operating roles and variants require current competence in every required element.
 - Duties, draft assignments, publication and cancellation. Qualification, availability, overlap and maximum-assignment checks are enforced on the server.
 - Audit records for business changes and account administration, OpenAPI in development, database migrations, example requests and automated tests.
 
@@ -83,7 +83,7 @@ Requirements: .NET 10 SDK, and MySQL (the Compose setup uses MySQL 8.4), or Dock
 
 For persistent local configuration, use `dotnet user-secrets --project src/SteamMuseum.Api set "ConnectionStrings:Museum" "..."` instead of committing credentials. Normal startup neither migrates the database nor creates accounts.
 
-6. Start the React frontend (Node.js 22.12+):
+6. Start the React frontend (Node.js 22.22.2+ or 24.15.0+):
 
    ```powershell
    Set-Location src/SteamMuseum.Web
@@ -142,7 +142,7 @@ See [example requests](docs/requests.http) and [endpoint guide](docs/api.md).
 - Saving availability upserts the supplied dates. Omitted dates are unchanged. `maximumAssignments` replaces the existing maximum; send the current maximum if only editing dates.
 - Members can change availability after assignment; affected assignments show live conflict warnings on the roster. The API does not silently cancel them. There is no email/push notification service yet.
 - Members cannot lower a maximum below their existing assignment count. A planner must cancel assignments first.
-- Qualification validity includes both start and end dates. Drivers and firemen require a specific locomotive; guards and station staff can have railway-wide qualifications. Different railway or locomotive qualifications do not grant driver access.
+- Element competence is valid from the assessment date until (but not including) its reassessment due date. Every duty requires a competence role matching its railway, category and any locomotive scope. Unlinked existing duties cannot be assigned or published.
 - Training records alone never authorize an assignment. An assessor must record a valid competence with assessment evidence.
 - Publication rechecks every rule. Existing published assignments remain visible with warnings if availability or competence subsequently changes; planners must resolve those warnings.
 - Reassign by cancelling then assigning again. Audit entries retain the original member and status history. Duty definitions are immutable through this API; duty editing/deletion workflows are not yet supplied.
@@ -187,3 +187,5 @@ dotnet ef migrations add YourChange --project src/SteamMuseum.Infrastructure --s
 2. Competence export/import with preview and manual verification.
 3. Locomotive and rolling stock asset details, maintenance records, scheduled work and service restrictions that also gate assignments.
 4. Group bookings and pricing; Xero OAuth connection, invoice mapping, idempotent creation, retry/reconciliation and invoice status updates. No Xero credentials or API calls are part of this implementation.
+
+Competence elements, reassessments, operating roles and variants: see [the competence workflow guide](docs/competence-elements.md).

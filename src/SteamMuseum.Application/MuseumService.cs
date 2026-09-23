@@ -2,13 +2,12 @@ using SteamMuseum.Domain;
 
 namespace SteamMuseum.Application;
 
-public sealed class MuseumService(IStore store, TimeProvider clock)
+public sealed partial class MuseumService(IStore store, TimeProvider clock)
 {
     public Task<List<AvailabilityWindow>> Windows(CancellationToken ct) => store.List<AvailabilityWindow>(_ => true, ct);
     public Task<List<Member>> Members(CancellationToken ct) => store.List<Member>(_ => true, ct);
     public Task<List<Railway>> Railways(CancellationToken ct) => store.List<Railway>(_ => true, ct);
     public Task<List<Locomotive>> Locomotives(CancellationToken ct) => store.List<Locomotive>(_ => true, ct);
-    public Task<List<Competence>> Competences(Guid member, CancellationToken ct) => store.List<Competence>(x => x.MemberId == member, ct);
     public Task<List<TrainingRecord>> Training(Guid member, CancellationToken ct) => store.List<TrainingRecord>(x => x.MemberId == member, ct);
     public Task<List<AuditEntry>> Audit(DateTime sinceUtc, CancellationToken ct)
     {
@@ -105,18 +104,6 @@ public sealed class MuseumService(IStore store, TimeProvider clock)
         await store.Save(ct);
         return await Availability(member, windowId, ct);
     }, ct);
-    public Task<Competence> RecordCompetence(Guid actor, CompetenceRequest request, CancellationToken ct) => Change(actor, "CompetenceRecorded", async () => {
-        await Get<Member>(request.MemberId, ct); await ValidateScope(request.Role, request.RailwayId, request.LocomotiveId, ct);
-        Require(request.ValidFrom.Year >= 1000 && (request.ValidUntil is null || request.ValidUntil >= request.ValidFrom), "Competence expiry precedes its start.");
-        var item = new Competence { MemberId = request.MemberId, Role = request.Role, RailwayId = request.RailwayId,
-            LocomotiveId = request.LocomotiveId, ValidFrom = request.ValidFrom, ValidUntil = request.ValidUntil,
-            Evidence = Text(request.Evidence, 2000, "Assessment evidence"), AssessedBy = actor, RecordedAtUtc = UtcNow };
-        store.Add(item); return item;
-    }, ct);
-    public Task<Competence> RevokeCompetence(Guid actor, Guid id, string reason, CancellationToken ct) => Change(actor, "CompetenceRevoked", async () => {
-        var item = await Get<Competence>(id, ct); Require(item.RevokedAtUtc is null, "Competence is already revoked.", 409);
-        item.RevocationReason = Text(reason, 500, "Reason"); item.RevokedAtUtc = UtcNow; return item;
-    }, ct);
     public Task<TrainingRecord> RecordTraining(Guid actor, Guid member, DateOnly date, string notes, CancellationToken ct) => Change(actor, "TrainingRecorded", async () => {
         await Get<Member>(member, ct);
         Require(date.Year >= 1000, "A valid training date is required.");
@@ -126,14 +113,16 @@ public sealed class MuseumService(IStore store, TimeProvider clock)
     private async Task ValidateScope(DutyRole role, Guid railway, Guid? locomotive, CancellationToken ct)
     {
         Require(Enum.IsDefined(role), "Invalid role."); await Get<Railway>(railway, ct);
-        Require(role is not (DutyRole.Driver or DutyRole.Fireman) || locomotive.HasValue, "Driver and fireman qualifications/duties must specify a locomotive.");
+        Require(role is not (DutyRole.Driver or DutyRole.Fireman) || locomotive.HasValue, "Driver and fireman duties must specify a locomotive.");
         if (locomotive.HasValue) await Get<Locomotive>(locomotive.Value, ct);
     }
     public Task<Duty> CreateDuty(Guid actor, DutyRequest request, CancellationToken ct) => Change(actor, "DutyCreated", async () => {
+        Require(request.CompetenceRoleId.HasValue, "Choose a competence role or variant for this duty.");
+        await ValidateDutyRole(request.CompetenceRoleId!.Value, request.Role, request.RailwayId, request.LocomotiveId, ct);
         await ValidateScope(request.Role, request.RailwayId, request.LocomotiveId, ct);
         Require(request.Date.Year >= 1000 && request.Start < request.End, "Duty end must follow its start on the same day.");
         var item = new Duty { Name = Text(request.Name, 150, "Name"), Date = request.Date, Start = request.Start,
-            End = request.End, Role = request.Role, RailwayId = request.RailwayId, LocomotiveId = request.LocomotiveId };
+            End = request.End, Role = request.Role, RailwayId = request.RailwayId, LocomotiveId = request.LocomotiveId, CompetenceRoleId = request.CompetenceRoleId };
         store.Add(item); return item;
     }, ct);
     private Task<List<Duty>> AssignedDuties(Guid member, Guid? excludingDuty, CancellationToken ct) =>
@@ -142,12 +131,13 @@ public sealed class MuseumService(IStore store, TimeProvider clock)
     {
         var member = await Get<Member>(memberId, ct);
         var availability = (await store.List<DailyAvailability>(x => x.MemberId == memberId && x.Date == duty.Date, ct)).SingleOrDefault();
-        var competences = await Competences(memberId, ct);
         var assigned = await AssignedDuties(memberId, duty.Id, ct);
         var windows = await store.List<AvailabilityWindow>(x => x.Start <= duty.Date && x.End >= duty.Date, ct);
         var prefs = await store.List<WindowPreference>(x => x.MemberId == memberId, ct);
-        return RosterRules.Check(duty, member, availability, competences, assigned,
-            windows.Select(w => (w, prefs.SingleOrDefault(p => p.WindowId == w.Id)?.MaximumAssignments, assigned.Count(d => w.Contains(d.Date)))));
+        IReadOnlyList<string> competenceIssues = duty.CompetenceRoleId is Guid roleId
+            ? (await EvaluateRole(memberId, roleId, duty.Date, ct)).Issues : ["Choose a competence role or variant for this duty."];
+        return RosterRules.Check(duty, member, availability, assigned,
+            windows.Select(w => (w, prefs.SingleOrDefault(p => p.WindowId == w.Id)?.MaximumAssignments, assigned.Count(d => w.Contains(d.Date)))), competenceIssues);
     }
     public Task<Assignment> Assign(Guid actor, Guid dutyId, Guid memberId, CancellationToken ct) => Change(actor, "DutyAssigned", async () => {
         var duty = await Get<Duty>(dutyId, ct);

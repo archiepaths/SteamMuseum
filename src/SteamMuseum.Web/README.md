@@ -1,6 +1,6 @@
 # Staff frontend
 
-React + TypeScript frontend for the existing Steam Museum API. Requires Node.js 22.12+ (Node 24 recommended).
+React + TypeScript frontend for the existing Steam Museum API. Requires Node.js 22.22.2+ or 24.15.0+ (Node 24 recommended).
 
 ## Development
 

@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { request } from "./api";
 import { monthRange, prettyDate, roleName } from "./dates";
-import { roles, type Member, type Reference, type Roster } from "./types";
+import {
+  roles,
+  type Member,
+  type Reference,
+  type Roster,
+  type CompetenceRole,
+} from "./types";
 import {
   ActionForm,
   Badge,
@@ -16,21 +22,58 @@ import {
 export function DutyFields({
   railways,
   locomotives,
-  competence = false,
+  competenceRoles = [],
 }: {
   railways: Reference[];
   locomotives: Reference[];
-  competence?: boolean;
+  competenceRoles?: CompetenceRole[];
 }) {
   const [role, setRole] = useState("Driver");
+  const [competenceRoleId, setCompetenceRoleId] = useState("");
+  const selectedRole = competenceRoles.find((r) => r.id === competenceRoleId);
   return (
     <>
-      <div className="fields">
+      {
+        <Field label="Competence role or variant">
+          <select
+            name="competenceRoleId"
+            required
+            value={competenceRoleId}
+            onChange={(e) => {
+              setCompetenceRoleId(e.target.value);
+              setRole(
+                competenceRoles.find((r) => r.id === e.target.value)
+                  ?.category ?? "Driver",
+              );
+            }}
+          >
+            <option value="" disabled>
+              Select role or variant
+            </option>
+            {competenceRoles
+              .filter(
+                (r) =>
+                  r.active &&
+                  (!r.baseRoleId ||
+                    competenceRoles.some(
+                      (p) => p.id === r.baseRoleId && p.active,
+                    )),
+              )
+              .map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+          </select>
+        </Field>
+      }
+      <div className="fields" key={competenceRoleId}>
         <Field label="Operating role">
           <select
             name="role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
+            disabled={!!selectedRole}
           >
             {roles.map((r) => (
               <option key={r} value={r}>
@@ -40,7 +83,12 @@ export function DutyFields({
           </select>
         </Field>
         <Field label="Railway">
-          <select name="railwayId" required defaultValue="">
+          <select
+            name="railwayId"
+            required
+            defaultValue={selectedRole?.railwayId ?? ""}
+            disabled={!!selectedRole}
+          >
             <option value="" disabled>
               Select railway
             </option>
@@ -57,9 +105,10 @@ export function DutyFields({
           <select
             name="locomotiveId"
             required={["Driver", "Fireman"].includes(role)}
-            defaultValue=""
+            defaultValue={selectedRole?.locomotiveId ?? ""}
+            disabled={!!selectedRole?.locomotiveId}
           >
-            <option value="">{competence ? "Railway-wide" : "None"}</option>
+            <option value="">None</option>
             {locomotives.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -68,6 +117,23 @@ export function DutyFields({
           </select>
         </Field>
       </div>
+      {selectedRole && (
+        <>
+          <input type="hidden" name="role" value={selectedRole.category} />
+          <input
+            type="hidden"
+            name="railwayId"
+            value={selectedRole.railwayId}
+          />
+          {selectedRole.locomotiveId && (
+            <input
+              type="hidden"
+              name="locomotiveId"
+              value={selectedRole.locomotiveId}
+            />
+          )}
+        </>
+      )}
     </>
   );
 }
@@ -80,6 +146,7 @@ export default function RosterPage({ planner }: { planner: boolean }) {
   const members = useResource<Member[]>(planner ? "/members" : null);
   const railways = useResource<Reference[]>("/railways");
   const locomotives = useResource<Reference[]>("/locomotives");
+  const competenceRoles = useResource<CompetenceRole[]>("/competence-roles");
   const rows = roster.data?.filter(
     (row) =>
       filter === "all" ||
@@ -133,8 +200,15 @@ export default function RosterPage({ planner }: { planner: boolean }) {
       {planner && (
         <details className="card">
           <summary>Create a duty</summary>
+          {competenceRoles.data?.length === 0 && (
+            <p className="notice">
+              An assessor must define competence roles before duties can be
+              created.
+            </p>
+          )}
           <ActionForm
             submit="Create duty"
+            submitDisabled={!competenceRoles.data?.some((r) => r.active)}
             onSubmit={async (f) => {
               const start = value(f, "start");
               const end = value(f, "end");
@@ -150,6 +224,7 @@ export default function RosterPage({ planner }: { planner: boolean }) {
                 role: value(f, "role"),
                 railwayId: value(f, "railwayId"),
                 locomotiveId: nullable(f, "locomotiveId"),
+                competenceRoleId: nullable(f, "competenceRoleId"),
               });
               roster.reload();
             }}
@@ -176,6 +251,7 @@ export default function RosterPage({ planner }: { planner: boolean }) {
             <DutyFields
               railways={railways.data ?? []}
               locomotives={locomotives.data ?? []}
+              competenceRoles={competenceRoles.data ?? []}
             />
           </ActionForm>
         </details>
@@ -194,7 +270,7 @@ export default function RosterPage({ planner }: { planner: boolean }) {
           </Field>
         )}
       </div>
-      {[roster, members, railways, locomotives].map((r, i) => (
+      {[roster, members, railways, locomotives, competenceRoles].map((r, i) => (
         <Status key={i} resource={r} />
       ))}
       {rows?.length === 0 && (
@@ -227,7 +303,12 @@ export default function RosterPage({ planner }: { planner: boolean }) {
               </div>
               <p>
                 {prettyDate(row.duty.date)} · {row.duty.start.slice(0, 5)}–
-                {row.duty.end.slice(0, 5)} · <b>{roleName(row.duty.role)}</b>
+                {row.duty.end.slice(0, 5)} ·{" "}
+                <b>
+                  {competenceRoles.data?.find(
+                    (r) => r.id === row.duty.competenceRoleId,
+                  )?.name ?? roleName(row.duty.role)}
+                </b>
               </p>
               <p className="muted">
                 {railways.data?.find((r) => r.id === row.duty.railwayId)
@@ -259,6 +340,54 @@ export default function RosterPage({ planner }: { planner: boolean }) {
                   </ul>
                 </div>
               )}
+              {planner &&
+                competenceRoles.data &&
+                competenceRoles.data.length > 0 && (
+                  <details>
+                    <summary>
+                      {row.duty.competenceRoleId
+                        ? "Change competence role"
+                        : "Set competence role"}
+                    </summary>
+                    <ActionForm
+                      submit="Set competence role"
+                      onSubmit={async (f) => {
+                        await request(
+                          `/duties/${row.duty.id}/competence-role`,
+                          "PUT",
+                          { roleId: value(f, "roleId") },
+                        );
+                        roster.reload();
+                      }}
+                    >
+                      <Field label="Required competence role">
+                        <select
+                          name="roleId"
+                          required
+                          defaultValue={row.duty.competenceRoleId ?? ""}
+                        >
+                          <option value="" disabled>
+                            Select role
+                          </option>
+                          {competenceRoles.data
+                            .filter(
+                              (r) =>
+                                r.active &&
+                                r.category === row.duty.role &&
+                                r.railwayId === row.duty.railwayId &&
+                                (!r.locomotiveId ||
+                                  r.locomotiveId === row.duty.locomotiveId),
+                            )
+                            .map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                              </option>
+                            ))}
+                        </select>
+                      </Field>
+                    </ActionForm>
+                  </details>
+                )}
               {planner && (
                 <ActionForm
                   key={row.assignment?.id + ":" + row.assignment?.status}

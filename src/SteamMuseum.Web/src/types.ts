@@ -43,6 +43,7 @@ export interface Availability {
   days: Day[];
 }
 export interface Duty {
+  competenceRoleId?: string | null;
   id: string;
   name: string;
   date: string;
@@ -62,17 +63,6 @@ export interface Roster {
   issues: string[];
   preferredRole: Role | null;
 }
-export interface Competence {
-  id: string;
-  role: Role;
-  railwayId: string;
-  locomotiveId: string | null;
-  validFrom: string;
-  validUntil: string | null;
-  evidence: string;
-  revokedAtUtc: string | null;
-  revocationReason: string | null;
-}
 export interface Training {
   id: string;
   date: string;
@@ -84,4 +74,50 @@ export interface Audit {
   atUtc: string;
   action: string;
   details: string;
+}
+
+export interface CompetenceElement {
+  id: string;
+  name: string;
+  description: string;
+  learningType: "Theory" | "Practical" | "TheoryAndPractical";
+  reassessmentMonths: number;
+  active: boolean;
+}
+export interface CompetenceRole {
+  id: string;
+  name: string;
+  baseRoleId: string | null;
+  category: Role;
+  railwayId: string;
+  locomotiveId: string | null;
+  active: boolean;
+  requirements: { elementId: string }[];
+}
+export interface ElementAssessment {
+  id: string;
+  memberId: string;
+  elementId: string;
+  outcome: "Competent" | "NotCompetent";
+  assessedOn: string;
+  reassessmentDue: string;
+  reassessmentMonths: number;
+  sequence: number;
+  evidence: string;
+  assessedBy: string;
+  recordedAtUtc: string;
+  revokedAtUtc: string | null;
+  revocationReason: string | null;
+}
+export interface RoleEligibility {
+  roleId: string;
+  name: string;
+  qualified: boolean;
+  issues: string[];
+  elements: {
+    elementId: string;
+    name: string;
+    status: string;
+    reassessmentDue: string | null;
+  }[];
 }

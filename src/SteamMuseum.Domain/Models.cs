@@ -52,24 +52,6 @@ public sealed class WindowPreference : Entity
     public Guid WindowId { get; set; }
     public int? MaximumAssignments { get; set; }
 }
-// Assessment entries are never overwritten. Revocation retains the original evidence.
-public sealed class Competence : Entity
-{
-    public Guid MemberId { get; set; }
-    public DutyRole Role { get; set; }
-    public Guid RailwayId { get; set; }
-    public Guid? LocomotiveId { get; set; }
-    public DateOnly ValidFrom { get; set; }
-    public DateOnly? ValidUntil { get; set; }
-    public string Evidence { get; set; } = "";
-    public Guid AssessedBy { get; set; }
-    public DateTime RecordedAtUtc { get; set; }
-    public DateTime? RevokedAtUtc { get; set; }
-    public string? RevocationReason { get; set; }
-    public bool Qualifies(Duty duty) => RevokedAtUtc is null && Role == duty.Role &&
-        RailwayId == duty.RailwayId && (LocomotiveId is null || LocomotiveId == duty.LocomotiveId) &&
-        ValidFrom <= duty.Date && (ValidUntil is null || ValidUntil >= duty.Date);
-}
 public sealed class TrainingRecord : Entity
 {
     public Guid MemberId { get; set; }
@@ -80,6 +62,7 @@ public sealed class TrainingRecord : Entity
 }
 public sealed class Duty : Entity
 {
+    public Guid? CompetenceRoleId { get; set; }
     public string Name { get; set; } = "";
     public DateOnly Date { get; set; }
     public TimeOnly Start { get; set; }
@@ -107,13 +90,13 @@ public sealed class AuditEntry : Entity
 public static class RosterRules
 {
     public static IReadOnlyList<string> Check(Duty duty, Member member, DailyAvailability? availability,
-        IEnumerable<Competence> competences, IEnumerable<Duty> existingDuties,
-        IEnumerable<(AvailabilityWindow Window, int? Maximum, int Assigned)> limits)
+        IEnumerable<Duty> existingDuties,
+        IEnumerable<(AvailabilityWindow Window, int? Maximum, int Assigned)> limits, IReadOnlyList<string> competenceIssues)
     {
         var issues = new List<string>();
         if (!member.Active) issues.Add("Member is inactive.");
         if (availability is null || !availability.Covers(duty)) issues.Add("Member is not available for the full duty.");
-        if (!competences.Any(c => c.MemberId == member.Id && c.Qualifies(duty))) issues.Add("No valid competence for this role, locomotive and railway on the duty date.");
+        issues.AddRange(competenceIssues);
         if (existingDuties.Any(duty.Overlaps)) issues.Add("Member already has an overlapping duty.");
         foreach (var (window, maximum, assigned) in limits)
             if (window.Contains(duty.Date) && maximum.HasValue && assigned >= maximum.Value)
