@@ -1,3 +1,8 @@
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import AvailabilityCalendar, {
+  AvailabilityView,
+  windowRanges,
+} from "./AvailabilityCalendar";
 import { useEffect, useState } from "react";
 import { DayPicker } from "@daypicker/react";
 import "@daypicker/react/style.css";
@@ -15,10 +20,24 @@ import {
   value,
 } from "./ui";
 
-export default function AvailabilityPage({ planner }: { planner: boolean }) {
+export default function AvailabilityPage({
+  planner,
+  editing = false,
+  managing = false,
+}: {
+  planner: boolean;
+  editing?: boolean;
+  managing?: boolean;
+}) {
+  const { windowId } = useParams();
+  const navigate = useNavigate();
+  const [search] = useSearchParams();
   const windows = useResource<Window[]>("/windows");
-  const [id, setId] = useState("");
-  const selected = id || windows.data?.[0]?.id || "";
+  const selected =
+    windowId ||
+    (managing ? search.get("window") : null) ||
+    windows.data?.[0]?.id ||
+    "";
   const resource = useResource<Availability>(
     selected ? `/me/availability/${selected}` : null,
   );
@@ -30,7 +49,16 @@ export default function AvailabilityPage({ planner }: { planner: boolean }) {
       </p>
       <div className="toolbar">
         <Field label="Availability window">
-          <select value={selected} onChange={(e) => setId(e.target.value)}>
+          <select
+            value={selected}
+            onChange={(e) =>
+              navigate(
+                managing
+                  ? `/availability/manage?window=${e.target.value}`
+                  : `/availability/${e.target.value}${editing ? "/edit" : ""}`,
+              )
+            }
+          >
             {windows.data?.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.name}
@@ -47,15 +75,36 @@ export default function AvailabilityPage({ planner }: { planner: boolean }) {
           No availability windows yet. A planner can open one for the team.
         </Empty>
       )}
-      {resource.data && (
-        <AvailabilityEditor
-          key={selected}
-          data={resource.data}
-          refresh={resource.reload}
-        />
+      {planner && !managing && (
+        <p>
+          <Link to="/availability/manage">Manage availability windows</Link>
+        </p>
       )}
-      {planner && (
-        <details className="card">
+      {managing && (
+        <p>
+          <Link to="/availability">Back to availability</Link>
+        </p>
+      )}
+      {selected && !managing && (
+        <p>
+          <Link to={`/availability/${selected}${editing ? "" : "/edit"}`}>
+            {editing ? "Back to availability" : "Edit availability"}
+          </Link>
+        </p>
+      )}
+      {resource.data &&
+        !managing &&
+        (editing ? (
+          <AvailabilityEditor
+            key={selected}
+            data={resource.data}
+            refresh={resource.reload}
+          />
+        ) : (
+          <AvailabilityView data={resource.data} />
+        ))}
+      {planner && managing && (
+        <details className="card" open>
           <summary>Manage availability windows</summary>
           <div className="split">
             <section>
@@ -305,11 +354,6 @@ function localDate(date: Date | undefined) {
   if (!date) return "";
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-function windowRanges(window: Window) {
-  return window.dateRanges?.length
-    ? [...window.dateRanges].sort((a, b) => a.start.localeCompare(b.start))
-    : [{ start: window.start, end: window.end }];
-}
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -479,69 +523,18 @@ export function AvailabilityEditor({
                   </span>
                 </div>
               </fieldset>
-              {ranges.map((range) => (
-                <section className="calendar-range" key={range.start}>
-                  {ranges.length > 1 && (
-                    <h3>
-                      {prettyDate(range.start)} – {prettyDate(range.end)}
-                    </h3>
-                  )}
-                  <div
-                    className="calendar"
-                    role="group"
-                    aria-label={`Availability calendar ${prettyDate(range.start)} to ${prettyDate(range.end)}`}
-                  >
-                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                      (x) => (
-                        <div className="day-label" key={x}>
-                          {x}
-                        </div>
-                      ),
-                    )}
-                    {Array.from(
-                      {
-                        length:
-                          (new Date(`${range.start}T12:00:00`).getDay() + 6) %
-                          7,
-                      },
-                      (_, i) => (
-                        <span key={`pad${i}`} />
-                      ),
-                    )}
-                    {datesBetween(range.start, range.end).map((date) => (
-                      <button
-                        type="button"
-                        key={date}
-                        aria-pressed={selectedDates.includes(date)}
-                        aria-label={`${prettyDate(date)}, ${days[date]?.status ?? "Not responded"}`}
-                        className={`calendar-day ${days[date]?.status.toLowerCase() ?? ""} ${selectedDates.includes(date) ? "selected" : ""}`}
-                        onClick={() => {
-                          setSelectedDates((prev) =>
-                            prev.includes(date)
-                              ? prev.filter((d) => d !== date)
-                              : [...prev, date],
-                          );
-                        }}
-                      >
-                        <strong>{Number(date.slice(-2))}</strong>
-                        <small>
-                          {new Date(`${date}T12:00:00`).toLocaleDateString(
-                            "en-GB",
-                            { month: "short" },
-                          )}
-                        </small>
-                        <span>
-                          {days[date]?.status === "Available"
-                            ? "Available"
-                            : days[date]
-                              ? "Unavailable"
-                              : "No response"}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ))}
+              <AvailabilityCalendar
+                data={data}
+                days={days}
+                selectedDates={selectedDates}
+                onSelect={(date) =>
+                  setSelectedDates((prev) =>
+                    prev.includes(date)
+                      ? prev.filter((d) => d !== date)
+                      : [...prev, date],
+                  )
+                }
+              />
               <div className="legend">
                 <span>● Available</span>
                 <span>○ No response</span>

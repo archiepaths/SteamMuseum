@@ -68,13 +68,20 @@ public sealed partial class MuseumService(IStore store, TimeProvider clock)
         Require(notes is null || notes.Length <= 2000, "Window notes must be at most 2000 characters.");
         var window = await Get<AvailabilityWindow>(id, ct); window.Notes = notes?.Trim(); return window;
     }, ct);
-    public async Task<AvailabilityView> Availability(Guid member, Guid windowId, CancellationToken ct)
+    public async Task<AvailabilityView> Availability(Guid member, Guid windowId, CancellationToken ct, bool includeDrafts = false)
     {
         var window = await Get<AvailabilityWindow>(windowId, ct);
         var preference = (await store.List<WindowPreference>(x => x.MemberId == member && x.WindowId == windowId, ct)).SingleOrDefault();
         var days = await store.List<DailyAvailability>(x => x.MemberId == member && x.Date >= window.Start && x.Date <= window.End, ct);
         var duties = await AssignedDuties(member, null, ct);
-        return new(window, preference?.MaximumAssignments, duties.Count(x => window.Contains(x.Date)), days.Where(x => window.Contains(x.Date)).OrderBy(x => x.Date).ToList());
+        var assignments = await store.AssignmentsInRange(window.Start, window.End, ct);
+        var roles = await CompetenceRoles(ct);
+        var visible = assignments.Where(a => a.MemberId == member && (includeDrafts || a.Status == AssignmentStatus.Published))
+            .Join(duties.Where(d => window.Contains(d.Date)), a => a.DutyId, d => d.Id,
+                (a, d) => new WindowAssignment(d.Id, d.Name, d.Date, d.Start, d.End,
+                    roles.SingleOrDefault(r => r.Id == d.CompetenceRoleId)?.Name ?? d.Role.ToString(), a.Status))
+            .OrderBy(a => a.Date).ThenBy(a => a.Start).ToList();
+        return new(window, preference?.MaximumAssignments, duties.Count(x => window.Contains(x.Date)), days.Where(x => window.Contains(x.Date)).OrderBy(x => x.Date).ToList(), visible);
     }
     public Task<AvailabilityView> SaveAvailability(Guid member, Guid windowId, AvailabilityRequest request, CancellationToken ct) => Change(member, "AvailabilityUpdated", async () => {
         var person = await Get<Member>(member, ct); Require(person.Active, "Member is inactive.", 403);

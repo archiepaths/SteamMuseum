@@ -127,6 +127,9 @@ public sealed class ApiTests : IAsyncLifetime
         }
         var view = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{id}");
         Assert.Equal(1, view.GetProperty("assigned").GetInt32());
+        var visibleShift = Assert.Single(view.GetProperty("assignments").EnumerateArray());
+        Assert.Equal("2030-10-02", visibleShift.GetProperty("date").GetString());
+        Assert.Equal("Guard", visibleShift.GetProperty("roleName").GetString());
         Assert.Equal(2, view.GetProperty("window").GetProperty("dateRanges").GetArrayLength());
         Assert.Equal("Meet at the station.\nBring lunch.", view.GetProperty("window").GetProperty("notes").GetString());
         Assert.Equal(new[] { "2030-10-02", "2030-10-20" }, view.GetProperty("days").EnumerateArray().Select(d => d.GetProperty("date").GetString()));
@@ -257,17 +260,31 @@ public sealed class ApiTests : IAsyncLifetime
         var assignment = (await Success(await admin.PostAsJsonAsync($"/api/duties/{first}/assignment", new { memberId = factory.MemberId }))).GetProperty("id").GetGuid();
         var mine = await member.GetFromJsonAsync<JsonElement>("/api/me/roster?from=2030-10-01&until=2030-10-31");
         Assert.Empty(mine.EnumerateArray());
+        var ownDraft = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{window}");
+        Assert.Empty(ownDraft.GetProperty("assignments").EnumerateArray());
+        var staffDraft = await admin.GetFromJsonAsync<JsonElement>($"/api/members/{factory.MemberId}/availability/{window}");
+        Assert.Equal("Draft", Assert.Single(staffDraft.GetProperty("assignments").EnumerateArray()).GetProperty("status").GetString());
         var second = await Duty("2030-10-08");
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync($"/api/duties/{second}/assignment", new { memberId = factory.MemberId })).StatusCode);
         await Success(await admin.PostAsync($"/api/assignments/{assignment}/publish", null));
         mine = await member.GetFromJsonAsync<JsonElement>("/api/me/roster?from=2030-10-01&until=2030-10-31");
         Assert.Single(mine.EnumerateArray());
+        var ownPublished = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{window}");
+        var calendarShift = Assert.Single(ownPublished.GetProperty("assignments").EnumerateArray());
+        Assert.Equal("Driver", calendarShift.GetProperty("roleName").GetString());
+        Assert.Equal(first, calendarShift.GetProperty("dutyId").GetGuid());
+        Assert.Equal("2030-10-01", calendarShift.GetProperty("date").GetString());
+        var otherMember = await admin.GetFromJsonAsync<JsonElement>($"/api/me/availability/{window}");
+        Assert.Empty(otherMember.GetProperty("assignments").EnumerateArray());
+
         Assert.Equal(HttpStatusCode.Conflict, (await member.PutAsJsonAsync($"/api/me/availability/{window}", new { maximumAssignments = 0, days = Array.Empty<object>() })).StatusCode);
         await Success(await member.PutAsJsonAsync($"/api/me/availability/{window}", new { maximumAssignments = 1, days = new[] { new { date = "2030-10-01", status = "Unavailable" } } }));
         var roster = await admin.GetFromJsonAsync<JsonElement>("/api/roster?from=2030-10-01&until=2030-10-31");
         Assert.Contains(roster.EnumerateArray(), x => x.GetProperty("issues").GetArrayLength() > 0);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsync($"/api/assignments/{assignment}/publish", null)).StatusCode);
         await Success(await admin.PostAsync($"/api/assignments/{assignment}/cancel", null));
+        var cancelledCalendar = await admin.GetFromJsonAsync<JsonElement>($"/api/members/{factory.MemberId}/availability/{window}");
+        Assert.Empty(cancelledCalendar.GetProperty("assignments").EnumerateArray());
         var nextAssignment = (await Success(await admin.PostAsJsonAsync($"/api/duties/{second}/assignment", new { memberId = factory.MemberId }))).GetProperty("id").GetGuid();
         await Success(await admin.PostAsJsonAsync($"/api/element-assessments/{competence}/revoke", new { reason = "Reassessment required" }));
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsync($"/api/assignments/{nextAssignment}/publish", null)).StatusCode);

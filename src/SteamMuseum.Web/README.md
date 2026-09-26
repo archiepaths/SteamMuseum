@@ -26,7 +26,8 @@ For a different API URL, copy `.env.example` to `.env.local`, edit `VITE_API_URL
 ## Included screens
 
 - Secure cookie sign-in, forced temporary password change, voluntary password changes, logout and session-expiry handling. CSRF tokens stay in memory and refresh after authentication changes.
-- Availability calendar with weekday selection, individual responses, partial-day times, preferred roles, notes, shift limits and closed-window viewing.
+- Read-only availability calendar with assigned roles and shift times; a separate editing page supports group day selection, individual responses, partial-day times, preferred roles, notes and shift limits. Members see published assignments; planners viewing staff calendars also see marked drafts.
+- Roles catalogue with linked detail pages showing required elements, including inherited requirements for variants.
 - Published member duties and competence/training history.
 - Planner duty creation, draft assignments, publication, cancellation, conflict filtering, member availability and window management.
 - Assessor qualification creation/revocation and append-only training records.
@@ -42,7 +43,9 @@ npm test
 npm run build
 ```
 
-Deploy `dist/` behind an HTTPS web server on the same origin as the API, routing `/api/*` to ASP.NET and other paths to the static frontend. With no `VITE_API_URL` at build time, production API requests use the same origin. For a separate permitted origin, set `VITE_API_URL` during the build and configure API CORS and same-site hosting. Keep credentials and data out of static files. `npm run preview` is only a local preview server, not a production host.
+Deploy `dist/` behind an HTTPS web server on the same origin as the API, routing `/api/*` to ASP.NET and other paths to the static frontend. Configure a history fallback: serve existing static files normally, and serve `index.html` for frontend routes such as `/roles/{id}` and `/availability/{windowId}/edit`. Never rewrite `/api/*` to `index.html`. Vite development and preview servers already support this fallback.
+
+With no `VITE_API_URL` at build time, production API requests use the same origin. For a separate permitted origin, set `VITE_API_URL` during the build and configure API CORS and same-site hosting. Keep credentials and data out of static files. `npm run preview` is only a local preview server, not a production host.
 
 ## Verification
 

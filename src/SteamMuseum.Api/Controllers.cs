@@ -53,7 +53,7 @@ public sealed class MuseumController(MuseumService museum) : ControllerBase
     [HttpPut("me/availability/{windowId:guid}")]
     public async Task<IActionResult> SaveAvailability(Guid windowId, AvailabilityRequest request, CancellationToken ct) => Ok(await museum.SaveAvailability(Actor, windowId, request, ct));
     [HttpGet("members/{memberId:guid}/availability/{windowId:guid}"), Authorize(Policy = "Planning")]
-    public async Task<IActionResult> MemberAvailability(Guid memberId, Guid windowId, CancellationToken ct) => Ok(await museum.Availability(memberId, windowId, ct));
+    public async Task<IActionResult> MemberAvailability(Guid memberId, Guid windowId, CancellationToken ct) => Ok(await museum.Availability(memberId, windowId, ct, includeDrafts: true));
     [HttpGet("members"), Authorize(Policy = "StaffRecords")]
     public async Task<IActionResult> Members(CancellationToken ct) => Ok(await museum.Members(ct));
     [HttpGet("railways")]

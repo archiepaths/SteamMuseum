@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import ElementRecords from "./ElementRecords";
 import { DutyFields } from "./Roster";
 import { request } from "./api";
@@ -49,7 +50,11 @@ function setup() {
 }
 it("shows failed required elements and prevents members from accessing assessment forms", async () => {
   setup();
-  render(<ElementRecords prefix="/me" memberId="" manage={false} />);
+  render(
+    <MemoryRouter>
+      <ElementRecords prefix="/me" memberId="" manage={false} />
+    </MemoryRouter>,
+  );
   await screen.findByText("Not qualified");
   expect(screen.getByText("Not competent")).toBeTruthy();
   expect(screen.queryByText("Record assessment or reassessment")).toBeNull();
@@ -57,7 +62,11 @@ it("shows failed required elements and prevents members from accessing assessmen
 });
 it("records a not competent assessment for the selected member", async () => {
   setup();
-  render(<ElementRecords prefix="/members/member" memberId="member" manage />);
+  render(
+    <MemoryRouter>
+      <ElementRecords prefix="/members/member" memberId="member" manage />
+    </MemoryRouter>,
+  );
   await screen.findByText("Not qualified");
   fireEvent.click(screen.getByText("Record assessment or reassessment"));
   fireEvent.change(screen.getByLabelText("Competence element"), {

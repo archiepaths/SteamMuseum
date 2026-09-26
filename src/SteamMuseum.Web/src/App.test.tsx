@@ -24,9 +24,9 @@ it("hides privileged navigation for members", async () => {
   );
   render(<App />);
   await screen.findByRole("heading", { name: "My availability" });
-  expect(screen.queryByRole("button", { name: "Administration" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Roster planner" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Staff records" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Administration" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Roster planner" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Staff records" })).toBeNull();
 });
 it("requires a temporary password change before loading business data", async () => {
   vi.mocked(request).mockResolvedValue({
@@ -41,10 +41,8 @@ it("requires a temporary password change before loading business data", async ()
     true,
   );
   expect(
-    (
-      screen.getByRole("button", {
-        name: "Administration",
-      }) as HTMLButtonElement
-    ).disabled,
-  ).toBe(true);
+    screen
+      .getByRole("link", { name: "Administration" })
+      .getAttribute("aria-disabled"),
+  ).toBe("true");
 });

@@ -24,7 +24,7 @@ public static class AccessRoles
 public sealed record WindowRequest(string Name, WindowKind Kind, DateOnly Start, DateOnly End, DateTime SubmissionDeadlineUtc, List<WindowDateRange>? DateRanges = null, string? Notes = null);
 public sealed record DayRequest(DateOnly Date, AvailabilityStatus Status, TimeOnly? From, TimeOnly? Until, DutyRole? PreferredRole, string? Note);
 public sealed record AvailabilityRequest(int? MaximumAssignments, List<DayRequest> Days);
-public sealed record AvailabilityView(AvailabilityWindow Window, int? MaximumAssignments, int Assigned, List<DailyAvailability> Days);
+public sealed record AvailabilityView(AvailabilityWindow Window, int? MaximumAssignments, int Assigned, List<DailyAvailability> Days, List<WindowAssignment> Assignments);
 public sealed record DutyRequest(string Name, DateOnly Date, TimeOnly Start, TimeOnly End, DutyRole Role, Guid RailwayId, Guid? LocomotiveId, Guid? CompetenceRoleId = null);
 public sealed record RosterView(Duty Duty, Assignment? Assignment, IReadOnlyList<string> Issues, DutyRole? PreferredRole);
 
@@ -32,3 +32,5 @@ public sealed record RosterView(Duty Duty, Assignment? Assignment, IReadOnlyList
 public sealed record ElementRequest(string Name, string Description, LearningType LearningType, int ReassessmentMonths, bool Active = true);
 public sealed record ElementAssessmentRequest(Guid MemberId, Guid ElementId, AssessmentOutcome Outcome, DateOnly AssessedOn, string Evidence);
 public sealed record CompetenceRoleRequest(string Name, Guid? BaseRoleId, DutyRole Category, Guid RailwayId, Guid? LocomotiveId, List<Guid> ElementIds, bool Active = true);
+
+public sealed record WindowAssignment(Guid DutyId, string Name, DateOnly Date, TimeOnly Start, TimeOnly End, string RoleName, AssignmentStatus Status);

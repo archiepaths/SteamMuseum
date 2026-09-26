@@ -40,6 +40,7 @@ export interface Availability {
   window: Window;
   maximumAssignments: number | null;
   assigned: number;
+  assignments?: WindowAssignment[];
   days: Day[];
 }
 export interface Duty {
@@ -120,4 +121,14 @@ export interface RoleEligibility {
     status: string;
     reassessmentDue: string | null;
   }[];
+}
+
+export interface WindowAssignment {
+  dutyId: string;
+  name: string;
+  date: string;
+  start: string;
+  end: string;
+  roleName: string;
+  status: "Draft" | "Published";
 }

@@ -15,13 +15,33 @@ import AvailabilityPage from "./Availability";
 import RosterPage from "./Roster";
 import RecordsPage from "./Records";
 import Administration from "./Administration";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  NavLink,
+  Navigate,
+  Link,
+  useLocation,
+  useNavigate,
+} from "react-router";
+import PasswordPage from "./PasswordPage";
+import RolesPage from "./RolesPage";
 import museumLogo from "./img/logo.svg";
 
 export default function App() {
+  return (
+    <BrowserRouter>
+      <StaffApp />
+    </BrowserRouter>
+  );
+}
+export function StaffApp() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [page, setPage] = useState("availability");
   const [collapsed, setCollapsed] = useState(false);
   async function load() {
     setLoading(true);
@@ -39,7 +59,6 @@ export default function App() {
     void load();
     const expired = () => {
       setUser(null);
-      setPage("availability");
     };
     window.addEventListener("session-expired", expired);
     return () => window.removeEventListener("session-expired", expired);
@@ -121,6 +140,7 @@ export default function App() {
   const tabs = [
     { id: "availability", label: "My availability", icon: CalendarDays },
     { id: "duties", label: "My duties", icon: ClipboardList },
+    { id: "roles", label: "Roles", icon: ShieldCheck },
     { id: "competence", label: "My competence", icon: ShieldCheck },
     ...(planner
       ? [{ id: "roster", label: "Roster planner", icon: CalendarDays }]
@@ -131,7 +151,12 @@ export default function App() {
       : []),
     { id: "password", label: "Change password", icon: KeyRound },
   ];
-  const currentPage = user.mustChangePassword ? "password" : page;
+  const currentPage = user.mustChangePassword
+    ? "password"
+    : location.pathname.split("/")[1];
+  const assessor = user.roles.some((r) =>
+    ["Assessor", "Administrator"].includes(r),
+  );
   return (
     <div className={`shell ${collapsed ? "collapsed" : ""}`}>
       <aside className="sidebar">
@@ -145,15 +170,19 @@ export default function App() {
         <p className="nav-caption">STAFF ROOM</p>
         <nav aria-label="Main navigation">
           {tabs.map((tab) => (
-            <button
+            <NavLink
               key={tab.id}
-              disabled={user.mustChangePassword && tab.id !== "password"}
-              className={currentPage === tab.id ? "selected" : ""}
-              onClick={() => setPage(tab.id)}
+              to={`/${tab.id}`}
+              aria-disabled={user.mustChangePassword && tab.id !== "password"}
+              onClick={(e) => {
+                if (user.mustChangePassword && tab.id !== "password")
+                  e.preventDefault();
+              }}
+              className={({ isActive }) => (isActive ? "selected" : "")}
             >
               <tab.icon size={19} />
               <span>{tab.label}</span>
-            </button>
+            </NavLink>
           ))}
         </nav>
         <div className="sidebar-bottom">
@@ -179,7 +208,7 @@ export default function App() {
               try {
                 await request("/auth/logout", "POST");
                 setUser(null);
-                setPage("availability");
+                navigate("/availability", { replace: true });
               } catch (e) {
                 setError((e as Error).message);
               }
@@ -191,7 +220,9 @@ export default function App() {
         <main>
           <div className="page-heading">
             <p className="eyebrow">STEAM MUSEUM / STAFF</p>
-            <h1>{tabs.find((t) => t.id === currentPage)?.label}</h1>
+            <h1>
+              {tabs.find((t) => t.id === currentPage)?.label ?? "Staff room"}
+            </h1>
           </div>
           {error && (
             <div className="error" role="alert">
@@ -199,79 +230,117 @@ export default function App() {
               <button onClick={() => setError("")}>Dismiss</button>
             </div>
           )}
-          {currentPage === "availability" && (
-            <AvailabilityPage planner={planner} />
-          )}
-          {["duties", "roster"].includes(currentPage) && (
-            <RosterPage key={currentPage} planner={currentPage === "roster"} />
-          )}
-          {["competence", "records"].includes(currentPage) && (
-            <RecordsPage
-              key={currentPage}
-              staff={currentPage === "records"}
-              planner={planner}
-              assessor={user.roles.some((r) =>
-                ["Assessor", "Administrator"].includes(r),
-              )}
+          <Routes>
+            <Route
+              path="/password"
+              element={
+                <PasswordPage
+                  user={user}
+                  onSaved={async () => {
+                    await load();
+                    navigate("/availability", { replace: true });
+                  }}
+                />
+              }
             />
-          )}
-          {currentPage === "admin" && admin && (
-            <Administration userId={user.id} />
-          )}
-          {currentPage === "password" && (
-            <section className="card narrow">
-              <h2>
-                {user.mustChangePassword
-                  ? "Choose your own password"
-                  : "Update your password"}
-              </h2>
-              <p>
-                {user.mustChangePassword
-                  ? "Change your temporary password before accessing staff records."
-                  : "Use at least 12 characters, including uppercase, lowercase, a number and a symbol."}
-              </p>
-              <ActionForm
-                submit="Change password"
-                onSubmit={async (f) => {
-                  if (value(f, "newPassword") !== value(f, "confirm"))
-                    throw new Error("The new passwords do not match.");
-                  await request("/auth/password", "POST", {
-                    currentPassword: value(f, "currentPassword"),
-                    newPassword: value(f, "newPassword"),
-                  });
-                  await load();
-                  setPage("availability");
-                }}
-              >
-                <Field label="Current password">
-                  <input
-                    name="currentPassword"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                  />
-                </Field>
-                <Field label="New password">
-                  <input
-                    name="newPassword"
-                    type="password"
-                    autoComplete="new-password"
-                    minLength={12}
-                    maxLength={256}
-                    required
-                  />
-                </Field>
-                <Field label="Confirm new password">
-                  <input
-                    name="confirm"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                  />
-                </Field>
-              </ActionForm>
-            </section>
-          )}
+            {user.mustChangePassword ? (
+              <Route path="*" element={<Navigate to="/password" replace />} />
+            ) : (
+              <>
+                <Route
+                  path="/"
+                  element={<Navigate to="/availability" replace />}
+                />
+                <Route
+                  path="/availability"
+                  element={<AvailabilityPage planner={planner} />}
+                />
+                <Route
+                  path="/availability/manage"
+                  element={
+                    planner ? (
+                      <AvailabilityPage planner managing />
+                    ) : (
+                      <Navigate to="/availability" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/availability/:windowId"
+                  element={<AvailabilityPage planner={planner} />}
+                />
+                <Route
+                  path="/availability/:windowId/edit"
+                  element={<AvailabilityPage planner={planner} editing />}
+                />
+                <Route
+                  path="/duties"
+                  element={<RosterPage planner={false} />}
+                />
+                <Route
+                  path="/roster"
+                  element={
+                    planner ? (
+                      <RosterPage planner />
+                    ) : (
+                      <Navigate to="/availability" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/competence"
+                  element={
+                    <RecordsPage
+                      staff={false}
+                      planner={planner}
+                      assessor={assessor}
+                    />
+                  }
+                />
+                <Route
+                  path="/records"
+                  element={
+                    staff ? (
+                      <RecordsPage
+                        staff
+                        planner={planner}
+                        assessor={assessor}
+                      />
+                    ) : (
+                      <Navigate to="/availability" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/roles"
+                  element={<RolesPage manage={assessor} />}
+                />
+                <Route
+                  path="/roles/:roleId"
+                  element={<RolesPage manage={assessor} />}
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    admin ? (
+                      <Administration userId={user.id} />
+                    ) : (
+                      <Navigate to="/availability" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="*"
+                  element={
+                    <section className="card">
+                      <h2>Page not found</h2>
+                      <Link to="/availability">Go to my availability</Link>
+                    </section>
+                  }
+                />
+              </>
+            )}
+          </Routes>
         </main>
         <footer>
           STEAM MUSEUM <span>Made possible by our people.</span>

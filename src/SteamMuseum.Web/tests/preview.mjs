@@ -45,7 +45,7 @@ const rows = [
       railwayId: "railway",
       locomotiveId: "locomotive",
     },
-    assignment: { id: "assignment", memberId: member.id, status: "Draft" },
+    assignment: { id: "assignment", memberId: member.id, status: "Published" },
     issues: [],
     preferredRole: "Guard",
   },
@@ -86,7 +86,25 @@ const server = http.createServer(async (req, res) => {
       if (route === "/windows") return json([window]);
       if (route.includes("/availability/")) {
         if (req.method === "PUT") availability = { ...availability, ...data };
-        return json(availability);
+        return json({
+          ...availability,
+          assignments: rows
+            .filter(
+              (r) =>
+                r.assignment.status !== "Cancelled" &&
+                (!route.startsWith("/me/") ||
+                  r.assignment.status === "Published"),
+            )
+            .map((r) => ({
+              dutyId: r.duty.id,
+              name: r.duty.name,
+              date: r.duty.date,
+              start: r.duty.start,
+              end: r.duty.end,
+              roleName: "Museum guard",
+              status: r.assignment.status,
+            })),
+        });
       }
       if (route === "/railways")
         return json([{ id: "railway", name: "Museum railway" }]);
@@ -164,7 +182,9 @@ const server = http.createServer(async (req, res) => {
     const target = path.resolve(
       root,
       "." +
-        decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname),
+        decodeURIComponent(
+          !path.extname(url.pathname) ? "/index.html" : url.pathname,
+        ),
     );
     if (
       !target.startsWith(root + path.sep) &&
@@ -177,9 +197,12 @@ const server = http.createServer(async (req, res) => {
     const content = await readFile(target);
     res.writeHead(200, {
       "Content-Type":
-        { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" }[
-          path.extname(target)
-        ] ?? "application/octet-stream",
+        {
+          ".html": "text/html",
+          ".js": "text/javascript",
+          ".css": "text/css",
+          ".svg": "image/svg+xml",
+        }[path.extname(target)] ?? "application/octet-stream",
     });
     res.end(content);
   } catch {

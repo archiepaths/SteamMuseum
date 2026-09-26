@@ -1,3 +1,4 @@
+import AvailabilityCalendar from "./AvailabilityCalendar";
 import { useState } from "react";
 import { request } from "./api";
 import { prettyDate, roleName } from "./dates";
@@ -127,6 +128,7 @@ export function MemberAvailability({ memberId }: { memberId: string }) {
           {availability.data.days.length === 0 && (
             <Empty>No responses recorded.</Empty>
           )}
+          <AvailabilityCalendar data={availability.data} />
           <div className="table-scroll">
             <table>
               <thead>

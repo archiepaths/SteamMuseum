@@ -127,7 +127,7 @@ small,
   display: grid;
   gap: 7px;
 }
-.sidebar nav button {
+.sidebar nav a {
   background: transparent;
   border: 0;
   color: #bdcfc5;
@@ -136,12 +136,12 @@ small,
   font-weight: 500;
   text-align: left;
 }
-.sidebar nav button:hover,
-.sidebar nav button.selected {
+.sidebar nav a:hover,
+.sidebar nav a.selected {
   background: #2b5146;
   color: #fff;
 }
-.sidebar nav button.selected {
+.sidebar nav a.selected {
   box-shadow: inset 3px 0 #dbbb77;
 }
 .sidebar-bottom {
@@ -646,11 +646,11 @@ footer span {
 }
 .collapsed .brand span,
 .collapsed .nav-caption,
-.collapsed .sidebar nav button span,
+.collapsed .sidebar nav a span,
 .collapsed .sidebar-bottom {
   display: none;
 }
-.collapsed .sidebar nav button {
+.collapsed .sidebar nav a {
   justify-content: center;
   padding: 14px;
 }
@@ -729,7 +729,7 @@ footer span {
     overflow-x: auto;
     gap: 6px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     flex-shrink: 0;
     font-size: 11px;
     padding: 9px;
@@ -741,7 +741,7 @@ footer span {
   .collapsed .sidebar {
     padding: 0;
   }
-  .collapsed .sidebar nav button span {
+  .collapsed .sidebar nav a span {
     display: inline;
   }
   .topbar {
@@ -941,4 +941,40 @@ footer span {
     --rdp-day-width: 34px;
     --rdp-day_button-width: 32px;
   }
+}
+
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.sidebar nav a[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.calendar-day .shift-label {
+  display: block;
+  background: #173e35;
+  color: white;
+  border-radius: 4px;
+  padding: 4px;
+  margin-top: 5px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  width: 100%;
+}
+div.calendar-day {
+  border-radius: 6px;
+}
+
+main a {
+  color: #285b46;
+  text-underline-offset: 3px;
+}
+main a:hover {
+  color: #173e30;
 }
