@@ -4,7 +4,7 @@ namespace SteamMuseum.Application;
 
 public sealed partial class MuseumService(IStore store, TimeProvider clock)
 {
-    public Task<List<AvailabilityWindow>> Windows(CancellationToken ct) => store.List<AvailabilityWindow>(_ => true, ct);
+    public Task<List<AvailabilityWindow>> Windows(CancellationToken ct, bool includeArchived = false) => store.List<AvailabilityWindow>(w => includeArchived || !w.IsArchived, ct);
     public Task<List<Member>> Members(CancellationToken ct) => store.List<Member>(_ => true, ct);
     public Task<List<Railway>> Railways(CancellationToken ct) => store.List<Railway>(_ => true, ct);
     public Task<List<Locomotive>> Locomotives(CancellationToken ct) => store.List<Locomotive>(_ => true, ct);
@@ -62,7 +62,7 @@ public sealed partial class MuseumService(IStore store, TimeProvider clock)
     }, ct);
     public Task<AvailabilityWindow> SetWindowOpen(Guid actor, Guid id, bool open, DateTime deadlineUtc, CancellationToken ct) => Change(actor, "WindowStateChanged", async () => {
         Require(deadlineUtc.Kind == DateTimeKind.Utc, "Deadline must include UTC (Z).");
-        var window = await Get<AvailabilityWindow>(id, ct); window.IsOpen = open; window.SubmissionDeadlineUtc = deadlineUtc; return window;
+        var window = await Get<AvailabilityWindow>(id, ct); Require(!window.IsArchived || !open, "Restore this window before reopening it.", 409); window.IsOpen = open; window.SubmissionDeadlineUtc = deadlineUtc; return window;
     }, ct);
     public Task<AvailabilityWindow> SetWindowNotes(Guid actor, Guid id, string? notes, CancellationToken ct) => Change(actor, "WindowNotesChanged", async () => {
         Require(notes is null || notes.Length <= 2000, "Window notes must be at most 2000 characters.");
@@ -86,7 +86,7 @@ public sealed partial class MuseumService(IStore store, TimeProvider clock)
     public Task<AvailabilityView> SaveAvailability(Guid member, Guid windowId, AvailabilityRequest request, CancellationToken ct) => Change(member, "AvailabilityUpdated", async () => {
         var person = await Get<Member>(member, ct); Require(person.Active, "Member is inactive.", 403);
         var window = await Get<AvailabilityWindow>(windowId, ct);
-        Require(window.IsOpen && UtcNow <= window.SubmissionDeadlineUtc, "This availability window is closed.", 409);
+        Require(!window.IsArchived && window.IsOpen && UtcNow <= window.SubmissionDeadlineUtc, "This availability window is closed.", 409);
         Require(request.MaximumAssignments is null or >= 0, "Maximum assignments cannot be negative.");
         Require(request.Days is not null && request.Days.Count <= 367, "Supply at most 367 dates.");
         var days = request.Days!;

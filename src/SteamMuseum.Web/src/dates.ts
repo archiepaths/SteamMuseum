@@ -25,3 +25,21 @@ export const monthRange = () => {
     until: localDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   };
 };
+
+// Construct the following local midnight using calendar arithmetic (DST-safe).
+export function deadlineUtc(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day + 1).toISOString();
+}
+export function deadlineDate(iso: string) {
+  const date = new Date(iso);
+  // Existing non-midnight deadlines retain their original local calendar date.
+  if (
+    date.getHours() === 0 &&
+    date.getMinutes() === 0 &&
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0
+  )
+    date.setDate(date.getDate() - 1);
+  return localDate(date);
+}

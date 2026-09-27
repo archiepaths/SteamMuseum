@@ -83,7 +83,44 @@ const server = http.createServer(async (req, res) => {
           roles: ["Member", "Administrator"],
           mustChangePassword: false,
         });
-      if (route === "/windows") return json([window]);
+      if (route === "/management/windows") return json([window]);
+      if (route === "/windows/bulk") {
+        window.isOpen = false;
+        if (data.action === "archive") window.isArchived = true;
+        if (data.action === "restore") window.isArchived = false;
+        return json([window]);
+      }
+      if (route === "/windows/fixture-window" && req.method === "PUT") {
+        Object.assign(window, {
+          name: data.name,
+          isOpen: data.open,
+          submissionDeadlineUtc: data.deadlineUtc,
+          notes: data.notes,
+        });
+        return json(window);
+      }
+      if (route === "/windows/fixture-window/availability")
+        return json({
+          window,
+          members: [
+            {
+              memberId: member.id,
+              displayName: member.displayName,
+              days: [
+                ...availability.days,
+                { date: "2026-09-02", status: "Unavailable" },
+                {
+                  date: "2026-09-03",
+                  status: "Available",
+                  from: "10:00:00",
+                  until: "14:00:00",
+                  note: "Morning shift",
+                },
+              ],
+            },
+          ],
+        });
+      if (route === "/windows") return json(window.isArchived ? [] : [window]);
       if (route.includes("/availability/")) {
         if (req.method === "PUT") availability = { ...availability, ...data };
         return json({

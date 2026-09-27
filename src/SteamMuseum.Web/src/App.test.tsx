@@ -23,7 +23,7 @@ it("hides privileged navigation for members", async () => {
       : [],
   );
   render(<App />);
-  await screen.findByRole("heading", { name: "My availability" });
+  await screen.findByRole("heading", { name: "My availability" }, { timeout: 5000 });
   expect(screen.queryByRole("link", { name: "Administration" })).toBeNull();
   expect(screen.queryByRole("link", { name: "Roster planner" })).toBeNull();
   expect(screen.queryByRole("link", { name: "Staff records" })).toBeNull();

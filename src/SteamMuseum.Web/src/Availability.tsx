@@ -8,7 +8,13 @@ import { DayPicker } from "@daypicker/react";
 import "@daypicker/react/style.css";
 import { CalendarDays, Check, Clock3 } from "lucide-react";
 import { request } from "./api";
-import { datesBetween, prettyDate, roleName } from "./dates";
+import {
+  deadlineUtc,
+  deadlineDate,
+  datesBetween,
+  prettyDate,
+  roleName,
+} from "./dates";
 import { roles, type Availability, type Day, type Window } from "./types";
 import {
   ActionForm,
@@ -54,7 +60,7 @@ export default function AvailabilityPage({
             onChange={(e) =>
               navigate(
                 managing
-                  ? `/availability/manage?window=${e.target.value}`
+                  ? `/manage/windows?window=${e.target.value}`
                   : `/availability/${e.target.value}${editing ? "/edit" : ""}`,
               )
             }
@@ -119,7 +125,7 @@ export default function AvailabilityPage({
                   onSubmit={async (f) => {
                     await request(`/windows/${selected}/state`, "PUT", {
                       open: value(f, "open") === "true",
-                      deadlineUtc: new Date(value(f, "deadline")).toISOString(),
+                      deadlineUtc: deadlineUtc(value(f, "deadline")),
                     });
                     windows.reload();
                     resource.reload();
@@ -134,12 +140,12 @@ export default function AvailabilityPage({
                       <option value="false">Closed</option>
                     </select>
                   </Field>
-                  <Field label="Submission deadline (your local time)">
+                  <Field label="Submission deadline (end of local day)">
                     <input
                       name="deadline"
-                      type="datetime-local"
+                      type="date"
                       required
-                      defaultValue={toLocalInput(
+                      defaultValue={deadlineDate(
                         resource.data.window.submissionDeadlineUtc,
                       )}
                     />
@@ -211,7 +217,7 @@ export function CreateWindowForm({ refresh }: { refresh: () => void }) {
           end: ordered[ordered.length - 1].end,
           ...(kind === "SpecialEvent" ? { dateRanges: ordered } : {}),
           notes: value(f, "notes") || null,
-          submissionDeadlineUtc: new Date(value(f, "deadline")).toISOString(),
+          submissionDeadlineUtc: deadlineUtc(value(f, "deadline")),
         });
         refresh();
       }}
@@ -307,8 +313,8 @@ export function CreateWindowForm({ refresh }: { refresh: () => void }) {
       <Field label="Window notes">
         <textarea name="notes" maxLength={2000} rows={5} />
       </Field>
-      <Field label="Submission deadline (your local time)">
-        <input name="deadline" type="datetime-local" required />
+      <Field label="Submission deadline (end of local day)">
+        <input name="deadline" type="date" required />
       </Field>
     </ActionForm>
   );
@@ -354,12 +360,7 @@ function localDate(date: Date | undefined) {
   if (!date) return "";
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-}
+
 export function AvailabilityEditor({
   data,
   refresh,
@@ -444,10 +445,7 @@ export function AvailabilityEditor({
           <Clock3 />
           <span>
             <strong>
-              {new Date(data.window.submissionDeadlineUtc).toLocaleDateString(
-                "en-GB",
-                { day: "numeric", month: "short" },
-              )}
+              {prettyDate(deadlineDate(data.window.submissionDeadlineUtc))}
             </strong>
             Response deadline
           </span>

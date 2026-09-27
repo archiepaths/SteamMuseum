@@ -27,6 +27,7 @@ export interface Window {
   notes?: string | null;
   submissionDeadlineUtc: string;
   isOpen: boolean;
+  isArchived?: boolean;
 }
 export interface Day {
   date: string;

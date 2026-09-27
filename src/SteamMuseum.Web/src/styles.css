@@ -385,9 +385,9 @@ fieldset {
   text-align: center;
   color: #7c887c;
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none;
   padding-bottom: 7px;
-  letter-spacing: 0.7px;
+  letter-spacing: normal;
 }
 .calendar-day {
   position: relative;
@@ -548,8 +548,8 @@ th {
   background: #f5f7f1;
   color: #788373;
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
+  text-transform: none;
+  letter-spacing: normal;
 }
 td,
 th {

@@ -1,10 +1,13 @@
-import { Link, useParams } from "react-router";
+import { Link, useParams, useLocation } from "react-router";
 import type { CompetenceElement, CompetenceRole, Reference } from "./types";
 import { Badge, Empty, Status, useResource } from "./ui";
 import { ElementForm, RoleForm } from "./CompetenceForms";
 
 export default function RolesPage({ manage }: { manage: boolean }) {
   const { roleId } = useParams();
+  const basePath = useLocation().pathname.startsWith("/manage")
+    ? "/manage/roles"
+    : "/roles";
   const catalog = useResource<CompetenceRole[]>("/competence-roles");
   const elements = useResource<CompetenceElement[]>("/competence-elements");
   const railways = useResource<Reference[]>("/railways");
@@ -55,7 +58,7 @@ export default function RolesPage({ manage }: { manage: boolean }) {
       ))}
       {roleId ? (
         <>
-          <Link to="/roles">← All roles</Link>
+          <Link to={basePath}>← All roles</Link>
           {catalog.data && !role && <Empty>Role not found.</Empty>}
           {role && (
             <>
@@ -71,8 +74,8 @@ export default function RolesPage({ manage }: { manage: boolean }) {
               {parent && (
                 <p>
                   Includes every requirement of{" "}
-                  <Link to={`/roles/${parent.id}`}>{parent.name}</Link>, plus
-                  the additional elements below.
+                  <Link to={`${basePath}/${parent.id}`}>{parent.name}</Link>,
+                  plus the additional elements below.
                 </p>
               )}
               <h2>Required competence elements</h2>
@@ -108,7 +111,7 @@ export default function RolesPage({ manage }: { manage: boolean }) {
                       .filter((r) => r.baseRoleId === role.id)
                       .map((r) => (
                         <li key={r.id}>
-                          <Link to={`/roles/${r.id}`}>{r.name}</Link>
+                          <Link to={`${basePath}/${r.id}`}>{r.name}</Link>
                         </li>
                       ))}
                   </ul>
@@ -127,7 +130,7 @@ export default function RolesPage({ manage }: { manage: boolean }) {
             {catalog.data?.map((r) => (
               <article className="card" key={r.id}>
                 <h2>
-                  <Link to={`/roles/${r.id}`}>{r.name}</Link>
+                  <Link to={`${basePath}/${r.id}`}>{r.name}</Link>
                 </h2>
                 <Badge>
                   {r.baseRoleId ? "Variant" : "Base role"}

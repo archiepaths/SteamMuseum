@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useState } from "react";
 import { request } from "./api";
 import { localDate, prettyDate } from "./dates";
@@ -27,6 +27,9 @@ export default function ElementRecords({
   memberId: string;
   manage: boolean;
 }) {
+  const rolePath = useLocation().pathname.startsWith("/manage")
+    ? "/manage/roles"
+    : "/roles";
   const elements = useResource<CompetenceElement[]>("/competence-elements");
   const catalog = useResource<CompetenceRole[]>("/competence-roles");
   const assessments = useResource<ElementAssessment[]>(
@@ -64,7 +67,7 @@ export default function ElementRecords({
           <section className="card" key={role.roleId}>
             <div className="section-heading">
               <h3>
-                <Link to={`/roles/${role.roleId}`}>{role.name}</Link>
+                <Link to={`${rolePath}/${role.roleId}`}>{role.name}</Link>
               </h3>
               <Badge tone={role.qualified ? "green" : ""}>
                 {role.qualified ? "Qualified" : "Not qualified"}
@@ -215,7 +218,7 @@ export default function ElementRecords({
           ))}
       </div>
       <p>
-        <Link to="/roles">Browse roles and competence elements</Link>
+        <Link to={rolePath}>Browse roles and competence elements</Link>
       </p>
     </>
   );

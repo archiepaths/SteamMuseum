@@ -281,8 +281,8 @@ describe("availability workflow", () => {
       target: { value: "Bring lunch" },
     });
     fireEvent.change(
-      screen.getByLabelText("Submission deadline (your local time)"),
-      { target: { value: "2099-01-01T12:00" } },
+      screen.getByLabelText("Submission deadline (end of local day)"),
+      { target: { value: "2099-01-01" } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Create window" }));
     await waitFor(() =>
@@ -337,8 +337,8 @@ describe("availability workflow", () => {
       target: { value: "2028-02" },
     });
     fireEvent.change(
-      screen.getByLabelText("Submission deadline (your local time)"),
-      { target: { value: "2028-01-31T12:00" } },
+      screen.getByLabelText("Submission deadline (end of local day)"),
+      { target: { value: "2028-01-31" } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Create window" }));
     await waitFor(() =>

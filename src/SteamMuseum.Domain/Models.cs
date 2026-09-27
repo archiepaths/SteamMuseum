@@ -21,6 +21,7 @@ public sealed class AvailabilityWindow : Entity
     public DateOnly End { get; set; }
     public DateTime SubmissionDeadlineUtc { get; set; }
     public bool IsOpen { get; set; } = true;
+    public bool IsArchived { get; set; }
     public string? Notes { get; set; }
     public List<WindowDateRange> DateRanges { get; set; } = [];
     // Empty ranges preserve the dates of windows created before multi-range support.

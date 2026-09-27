@@ -52,3 +52,15 @@ With no `VITE_API_URL` at build time, production API requests use the same origi
 `npm test` covers CSRF rotation, cookie requests, server errors, role restrictions, forced password changes, availability preservation, unavailable-day normalization, time validation and date boundaries. `npm run build` performs strict TypeScript checks and creates a production bundle.
 
 For repeatable browser layout checks without real accounts or a database, build with `VITE_API_URL` unset, then run `node tests/preview.mjs` and open `http://localhost:5180`. This explicitly separate server supplies synthetic records and implements only the preview interactions; it is never loaded by the application or normal development/production servers. It does not test live API authentication or database integration.
+
+## Management workspace
+
+Open **Administration** (administrators) or **Management** (planners and assessors) in the staff navigation to enter `/manage`. This workspace uses a compact layout with dedicated roster, availability-window, staff-record, role, account, reference-data and activity pages. Each person sees only the tools permitted by their existing access roles. **Staff portal** returns to the personal availability view. The original `/admin`, `/roster`, `/records` and `/availability/manage` links redirect to their management pages. Personal role browsing stays read-only; assessors edit the catalogue from management.
+
+Availability windows now use a selectable management table with atomic bulk close/archive actions and a right-hand create/edit panel. Archived windows are closed and omitted from staff listings; use **Show archived**, then open a row to restore it (still closed). Responses and roster limits are retained. Existing window dates are read-only; names, notes, submission deadlines and open/closed state can be edited.
+
+**View window** opens the staff-by-date availability grid. Only staff with responses on the window's included dates appear; gaps between special-event ranges are excluded. White means no response, green available, red unavailable, and a clock indicates partial hours. Hover for details or select a cell to show them below the grid. Responses are shared across overlapping windows, so the grid reflects current responses for those dates.
+
+Apply the `ArchiveAvailabilityWindows` database migration before starting the updated API (see the repository migration instructions). This adds a non-null `IsArchived` flag defaulting to false; it does not delete any existing window or response.
+
+Window submission deadlines use a date-only input. Saving sets the deadline to local midnight immediately after that date, then converts it to UTC using the browser timezone (including daylight-saving rules). Existing timed deadlines keep their stored value until edited. Closed/expired windows use darker rows; the Dates column shows the overall start and end. Toolbar icons include explanatory tooltips and accessible names.

@@ -100,6 +100,39 @@ public sealed class ApiTests : IAsyncLifetime
         return JsonSerializer.Deserialize<JsonElement>(body);
     }
     [Fact]
+    public async Task Window_management_preserves_responses_and_restricts_bulk_actions()
+    {
+        using var admin = factory.Client(); using var member = factory.Client();
+        await ApiFactory.Login(admin, "admin@example.test"); await ApiFactory.Login(member, "member@example.test");
+        var window = (await Success(await admin.PostAsJsonAsync("/api/windows", new { name = "Matrix weekends", kind = "SpecialEvent", submissionDeadlineUtc = "2099-09-30T23:59:00Z", dateRanges = new[] { new { start = "2099-10-01", end = "2099-10-02" }, new { start = "2099-10-05", end = "2099-10-05" } } }))).GetProperty("id").GetGuid();
+        await Success(await member.PutAsJsonAsync($"/api/me/availability/{window}", new { maximumAssignments = 2, days = new[] { new { date = "2099-10-01", status = "Available", from = "10:00:00", until = "14:00:00" } } }));
+        var matrix = await admin.GetFromJsonAsync<JsonElement>($"/api/windows/{window}/availability");
+        var row = Assert.Single(matrix.GetProperty("members").EnumerateArray());
+        Assert.Equal(factory.MemberId, row.GetProperty("memberId").GetGuid());
+        Assert.Equal("10:00:00", Assert.Single(row.GetProperty("days").EnumerateArray()).GetProperty("from").GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync($"/api/windows/{window}/availability")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/management/windows")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.PostAsJsonAsync("/api/windows/bulk", new { ids = new[] { window }, action = "archive" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsJsonAsync("/api/windows/bulk", new { ids = new[] { window, Guid.NewGuid() }, action = "archive" })).StatusCode);
+        var unchanged = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{window}");
+        Assert.True(unchanged.GetProperty("window").GetProperty("isOpen").GetBoolean());
+        await Success(await admin.PutAsJsonAsync($"/api/windows/{window}", new { name = "Renamed weekends", open = true, deadlineUtc = "2099-10-01T00:00:00Z", notes = "Bring lunch" }));
+        await Success(await admin.PostAsJsonAsync("/api/windows/bulk", new { ids = new[] { window }, action = "archive" }));
+        var visible = await member.GetFromJsonAsync<JsonElement>("/api/windows");
+        Assert.DoesNotContain(visible.EnumerateArray(), w => w.GetProperty("id").GetGuid() == window);
+        var all = await admin.GetFromJsonAsync<JsonElement>("/api/management/windows");
+        Assert.Contains(all.EnumerateArray(), w => w.GetProperty("id").GetGuid() == window && w.GetProperty("isArchived").GetBoolean());
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PutAsJsonAsync($"/api/windows/{window}/state", new { open = true, deadlineUtc = "2099-10-01T00:00:00Z" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await member.PutAsJsonAsync($"/api/me/availability/{window}", new { maximumAssignments = 2, days = Array.Empty<object>() })).StatusCode);
+        matrix = await admin.GetFromJsonAsync<JsonElement>($"/api/windows/{window}/availability");
+        Assert.Single(matrix.GetProperty("members").EnumerateArray());
+        await Success(await admin.PostAsJsonAsync("/api/windows/bulk", new { ids = new[] { window }, action = "restore" }));
+        var restored = await member.GetFromJsonAsync<JsonElement>($"/api/me/availability/{window}");
+        Assert.False(restored.GetProperty("window").GetProperty("isOpen").GetBoolean());
+        Assert.False(restored.GetProperty("window").GetProperty("isArchived").GetBoolean());
+        Assert.Single(restored.GetProperty("days").EnumerateArray());
+    }
+    [Fact]
     public async Task Special_event_ranges_exclude_gaps_and_preserve_shared_responses_and_notes()
     {
         using var admin = factory.Client(); using var member = factory.Client();

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -15,6 +15,14 @@ vi.mock("./api", () => ({
   request: vi.fn(),
   ApiError: class extends Error {},
 }));
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+  };
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -158,13 +166,58 @@ it("redirects members away from privileged direct URLs without fetching privileg
 });
 it("allows planners to create the first availability window from its own page", async () => {
   setup("/availability/manage", ["Planner"]);
-  await screen.findByRole("heading", { name: "Open a new window" });
+  fireEvent.click(
+    await screen.findByRole("button", { name: /Add a new window/ }),
+  );
+  await screen.findByRole("dialog", { name: "Add a new window" });
   expect(
     screen.queryByRole("button", { name: "Save my availability" }),
   ).toBeNull();
   await waitFor(() =>
-    expect(
-      screen.getByRole("link", { name: "Back to availability" }),
-    ).toBeTruthy(),
+    expect(screen.getByRole("link", { name: "Staff portal" })).toBeTruthy(),
   );
+});
+
+it("separates administrative pages and returns to the staff layout", async () => {
+  setup("/manage/accounts", ["Administrator"]);
+  await screen.findByRole("heading", { name: "Create staff account" });
+  expect(
+    screen.queryByRole("heading", { name: "Activity history" }),
+  ).toBeNull();
+  expect(
+    vi.mocked(request).mock.calls.some(([path]) => path.startsWith("/audit")),
+  ).toBe(false);
+  fireEvent.click(screen.getByRole("link", { name: "Reference data" }));
+  await screen.findByRole("heading", { name: "Railways" });
+  expect(
+    screen.queryByRole("heading", { name: "Create staff account" }),
+  ).toBeNull();
+  fireEvent.click(screen.getByRole("link", { name: "Staff portal" }));
+  await screen.findByRole("heading", { name: "My availability" });
+  expect(
+    screen.queryByRole("navigation", { name: "Management navigation" }),
+  ).toBeNull();
+});
+it("keeps planner access separate from administrator account tools", async () => {
+  setup("/manage/accounts", ["Planner"]);
+  await screen.findByRole("heading", { name: "Overview" });
+  expect(screen.queryByRole("link", { name: "Staff accounts" })).toBeNull();
+  expect(
+    screen.queryByRole("heading", { name: "Create staff account" }),
+  ).toBeNull();
+  expect(
+    vi
+      .mocked(request)
+      .mock.calls.some(
+        ([path]) => path === "/members" || path.startsWith("/audit"),
+      ),
+  ).toBe(false);
+});
+it("keeps role drill-down inside management", async () => {
+  setup("/manage/roles/variant", ["Assessor"]);
+  await screen.findByRole("heading", { name: "Loco B familiarisation" });
+  expect(
+    screen.getByRole("link", { name: /All roles/ }).getAttribute("href"),
+  ).toBe("/manage/roles");
+  expect(screen.getByText("Edit role requirements")).toBeTruthy();
 });

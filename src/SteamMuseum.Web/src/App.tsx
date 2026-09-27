@@ -14,7 +14,7 @@ import { ActionForm, Field, value } from "./ui";
 import AvailabilityPage from "./Availability";
 import RosterPage from "./Roster";
 import RecordsPage from "./Records";
-import Administration from "./Administration";
+import AdminPortal from "./AdminPortal";
 import {
   BrowserRouter,
   Routes,
@@ -142,12 +142,14 @@ export function StaffApp() {
     { id: "duties", label: "My duties", icon: ClipboardList },
     { id: "roles", label: "Roles", icon: ShieldCheck },
     { id: "competence", label: "My competence", icon: ShieldCheck },
-    ...(planner
-      ? [{ id: "roster", label: "Roster planner", icon: CalendarDays }]
-      : []),
-    ...(staff ? [{ id: "records", label: "Staff records", icon: Users }] : []),
-    ...(admin
-      ? [{ id: "admin", label: "Administration", icon: ShieldCheck }]
+    ...(staff
+      ? [
+          {
+            id: "manage",
+            label: admin ? "Administration" : "Management",
+            icon: ShieldCheck,
+          },
+        ]
       : []),
     { id: "password", label: "Change password", icon: KeyRound },
   ];
@@ -157,6 +159,20 @@ export function StaffApp() {
   const assessor = user.roles.some((r) =>
     ["Assessor", "Administrator"].includes(r),
   );
+  if (!user.mustChangePassword && location.pathname.startsWith("/manage")) {
+    return staff ? (
+      <AdminPortal
+        user={user}
+        onLogout={async () => {
+          await request("/auth/logout", "POST");
+          setUser(null);
+          navigate("/availability", { replace: true });
+        }}
+      />
+    ) : (
+      <Navigate to="/availability" replace />
+    );
+  }
   return (
     <div className={`shell ${collapsed ? "collapsed" : ""}`}>
       <aside className="sidebar">
@@ -259,7 +275,7 @@ export function StaffApp() {
                   path="/availability/manage"
                   element={
                     planner ? (
-                      <AvailabilityPage planner managing />
+                      <Navigate to="/manage/windows" replace />
                     ) : (
                       <Navigate to="/availability" replace />
                     )
@@ -281,7 +297,7 @@ export function StaffApp() {
                   path="/roster"
                   element={
                     planner ? (
-                      <RosterPage planner />
+                      <Navigate to="/manage/roster" replace />
                     ) : (
                       <Navigate to="/availability" replace />
                     )
@@ -301,29 +317,22 @@ export function StaffApp() {
                   path="/records"
                   element={
                     staff ? (
-                      <RecordsPage
-                        staff
-                        planner={planner}
-                        assessor={assessor}
-                      />
+                      <Navigate to="/manage/records" replace />
                     ) : (
                       <Navigate to="/availability" replace />
                     )
                   }
                 />
-                <Route
-                  path="/roles"
-                  element={<RolesPage manage={assessor} />}
-                />
+                <Route path="/roles" element={<RolesPage manage={false} />} />
                 <Route
                   path="/roles/:roleId"
-                  element={<RolesPage manage={assessor} />}
+                  element={<RolesPage manage={false} />}
                 />
                 <Route
                   path="/admin"
                   element={
                     admin ? (
-                      <Administration userId={user.id} />
+                      <Navigate to="/manage/accounts" replace />
                     ) : (
                       <Navigate to="/availability" replace />
                     )

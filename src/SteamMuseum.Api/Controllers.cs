@@ -42,6 +42,14 @@ public sealed class MuseumController(MuseumService museum) : ControllerBase
     private Guid Actor => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     [HttpGet("windows")]
     public async Task<IActionResult> Windows(CancellationToken ct) => Ok(await museum.Windows(ct));
+    [HttpGet("management/windows"), Authorize(Policy = "Planning")]
+    public async Task<IActionResult> ManagementWindows(CancellationToken ct) => Ok(await museum.Windows(ct, includeArchived: true));
+    [HttpPut("windows/{id:guid}"), Authorize(Policy = "Planning")]
+    public async Task<IActionResult> UpdateWindow(Guid id, WindowUpdateRequest request, CancellationToken ct) => Ok(await museum.UpdateWindow(Actor, id, request, ct));
+    [HttpPost("windows/bulk"), Authorize(Policy = "Planning")]
+    public async Task<IActionResult> BulkWindows(WindowBulkRequest request, CancellationToken ct) => Ok(await museum.BulkWindows(Actor, request, ct));
+    [HttpGet("windows/{id:guid}/availability"), Authorize(Policy = "Planning")]
+    public async Task<IActionResult> WindowAvailability(Guid id, CancellationToken ct) => Ok(await museum.WindowAvailability(id, ct));
     [HttpPost("windows"), Authorize(Policy = "Planning")]
     public async Task<IActionResult> CreateWindow(WindowRequest request, CancellationToken ct) => Ok(await museum.CreateWindow(Actor, request, ct));
     [HttpPut("windows/{id:guid}/state"), Authorize(Policy = "Planning")]

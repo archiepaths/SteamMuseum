@@ -34,3 +34,8 @@ public sealed record ElementAssessmentRequest(Guid MemberId, Guid ElementId, Ass
 public sealed record CompetenceRoleRequest(string Name, Guid? BaseRoleId, DutyRole Category, Guid RailwayId, Guid? LocomotiveId, List<Guid> ElementIds, bool Active = true);
 
 public sealed record WindowAssignment(Guid DutyId, string Name, DateOnly Date, TimeOnly Start, TimeOnly End, string RoleName, AssignmentStatus Status);
+
+public sealed record WindowUpdateRequest(string Name, bool Open, DateTime DeadlineUtc, string? Notes);
+public sealed record WindowBulkRequest(List<Guid> Ids, string Action);
+public sealed record WindowMatrix(AvailabilityWindow Window, List<WindowMatrixMember> Members);
+public sealed record WindowMatrixMember(Guid MemberId, string DisplayName, List<DailyAvailability> Days);
