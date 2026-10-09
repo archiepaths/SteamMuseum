@@ -15,9 +15,10 @@ using OpenIddict.Abstractions;
 using OpenIddict.Validation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+var provider = builder.Configuration["Database:Provider"];
 var connection = builder.Configuration.GetConnectionString("Museum")
-    ?? "Server=localhost;Port=3306;Database=steam_museum;User=museum;Password=configure-me";
-builder.Services.AddDbContext<MuseumDbContext>(o => o.UseMySQL(connection));
+    ?? DatabaseConfiguration.DefaultConnectionFor(provider);
+builder.Services.AddDbContext<MuseumDbContext>(o => o.UseMuseumDatabase(provider, connection));
 builder.Services.AddScoped<IStore, EfStore>();
 builder.Services.AddScoped<MuseumService>();
 builder.Services.AddScoped<AccountService>();
@@ -72,6 +73,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Ad
 builder.Services.AddOpenApi();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["https://localhost:5173"])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+builder.Services.AddMuseumProxyHeaders(builder.Configuration);
 var app = builder.Build();
 
 // Explicit operator commands: normal application startup never changes schema or creates an admin.
@@ -100,9 +102,11 @@ if (args.Contains("--migrate") || args.Contains("--bootstrap-admin") || args.Con
     }
     return;
 }
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
-app.UseHttpsRedirection();
+app.UseWhen(context => !context.Request.Path.StartsWithSegments("/health"),
+    branch => branch.UseHttpsRedirection());
 app.UseRouting();
 app.UseCors();
 app.UseRateLimiter();
@@ -150,6 +154,19 @@ app.Use(async (context, next) => {
     await next(context);
 });
 app.MapGet("/health/live", () => Results.Ok(new { status = "alive" })).AllowAnonymous();
+app.MapGet("/health/ready", async (MuseumDbContext db, ILogger<Program> logger, CancellationToken ct) => {
+    try
+    {
+        return await db.Set<MutationLock>().AnyAsync(x => x.Id == 1, ct)
+            ? Results.Ok(new { status = "ready" })
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (Exception exception) when (!ct.IsCancellationRequested)
+    {
+        logger.LogWarning(exception, "Database readiness check failed.");
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+}).AllowAnonymous();
 app.MapGet("/api/auth/csrf", (HttpContext context, IAntiforgery anti) => {
     context.Response.Headers.CacheControl = "no-store";
     return Results.Ok(new { token = anti.GetAndStoreTokens(context).RequestToken });
@@ -159,6 +176,3 @@ app.MapControllers();
 app.Run();
 
 public partial class Program;
-
-
-

@@ -19,6 +19,7 @@ namespace SteamMuseum.Tests;
 
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    private readonly string? sqlServer = Environment.GetEnvironmentVariable("MUSEUM_TEST_SQLSERVER");
     private readonly string? mysql = Environment.GetEnvironmentVariable("MUSEUM_TEST_MYSQL");
     private readonly string mysqlDatabase = $"steammuseum_test_{Guid.NewGuid():N}";
     private readonly string database = Path.Combine(Path.GetTempPath(), $"museum-tests-{Guid.NewGuid():N}.db");
@@ -38,7 +39,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<MuseumDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<MuseumDbContext>>();
             services.AddDbContext<MuseumDbContext>(o => {
-                if (mysql is null) o.UseSqlite($"Data Source={database};Pooling=False");
+                if (sqlServer is not null) {
+                    var connection = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(sqlServer) { InitialCatalog = mysqlDatabase };
+                    o.UseMuseumDatabase("SqlServer", connection.ConnectionString);
+                }
+                else if (mysql is null) o.UseSqlite($"Data Source={database};Pooling=False");
                 else { var connection = new MySql.Data.MySqlClient.MySqlConnectionStringBuilder(mysql) { Database = mysqlDatabase }; o.UseMySQL(connection.ConnectionString); }
             });
         });
@@ -47,7 +52,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MuseumDbContext>();
-        if (mysql is null) await db.Database.EnsureCreatedAsync(); else await db.Database.MigrateAsync();
+        if (mysql is null && sqlServer is null) await db.Database.EnsureCreatedAsync(); else await db.Database.MigrateAsync();
         var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         foreach (var role in AccessRoles.All) Assert.True((await roles.CreateAsync(new(role))).Succeeded);
         var users = scope.ServiceProvider.GetRequiredService<UserManager<MuseumUser>>();
@@ -78,7 +83,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private bool cleaned;
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !cleaned && mysql is not null) {
+        if (disposing && !cleaned && (mysql is not null || sqlServer is not null)) {
             cleaned = true;
             using var scope = Services.CreateScope();
             scope.ServiceProvider.GetRequiredService<MuseumDbContext>().Database.EnsureDeleted();
@@ -325,11 +330,3 @@ public sealed class ApiTests : IAsyncLifetime
         Assert.NotEqual(JsonValueKind.Null, history[0].GetProperty("revokedAtUtc").ValueKind);
     }
 }
-
-
-
-
-
-
-
-

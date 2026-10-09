@@ -59,3 +59,14 @@ MySQL tests apply the included migrations to freshly created test databases. The
 The MySQL 8.4 CI configuration is included but was not executed on a remote CI runner in this session. The React frontend, external email delivery, competence import and Xero integration are not included or tested. Production hosting and operational acceptance remain deployment work.
 
 During local verification, Windows TLS restrictions prevented direct NuGet access from the .NET process. Packages were retrieved from official NuGet endpoints through a temporary loopback TLS bridge; the delivered NuGet configuration uses the normal official HTTPS source. Vulnerability auditing was disabled for that local restore only; the delivered project and CI retain NuGet's default auditing behaviour.
+
+## Azure SQL and container packaging (9 October 2026)
+
+- .NET SDK 10.0.401 production build/publish passed with warnings treated as errors.
+- Full API suite: 43 tests passed on SQLite and 43 passed on SQL Server LocalDB, applying the real SQL Server migration to isolated test databases. Coverage includes authentication, native token replay protection, serializable business mutations and database readiness.
+- After adding provider-default regressions, all seven hosting/provider tests passed. These include SQL Server/MySQL selection, unknown-provider rejection and forwarding-header allowlists.
+- EF verified no pending model changes for either SQL Server or the retained MySQL migration snapshot.
+- Production published-artifact smoke check passed for HTTP liveness, trusted HTTPS forwarding, Secure/SameSite=Strict CSRF cookies and file-persisted Data Protection keys.
+- SQL Server Compose configuration validated successfully.
+- Docker image build could not run because the local Docker Desktop Linux engine was unavailable, including after background startup attempts. The Dockerfile's restore/publish steps were verified locally; Linux image construction is configured in CI and can also run through `az acr build`.
+- Azure resources were not created or changed. Actual Azure SQL managed identity/networking, Azure Files mount permissions and Container Apps ingress still require deployment-specific verification. No existing MySQL records were transferred or modified.

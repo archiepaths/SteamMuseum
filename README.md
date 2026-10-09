@@ -1,6 +1,6 @@
 # Steam Museum API
 
-The API for staff availability, competence records and rostering, built with .NET 10, EF Core 10 and MySQL. The React web app is a separate project in the sibling SteamMuseumWeb folder.
+The API for staff availability, competence records and rostering, built with .NET 10, EF Core 10 and Azure SQL / SQL Server. Legacy MySQL databases remain supported through an explicit provider setting. The React web app is a separate project in the sibling SteamMuseumWeb folder.
 
 ## Included
 
@@ -21,7 +21,8 @@ The [React staff frontend](../SteamMuseumWeb/README.md) includes member, planner
 src/
   SteamMuseum.Domain/          Entities and pure roster rules; no framework dependencies
   SteamMuseum.Application/     Use cases, request/response contracts and persistence ports
-  SteamMuseum.Infrastructure/  EF Core/MySQL, migrations and ASP.NET Core Identity
+  SteamMuseum.Infrastructure/  EF Core providers, legacy MySQL migrations and ASP.NET Core Identity
+  SteamMuseum.SqlServerMigrations/ SQL Server / Azure SQL schema migrations
   SteamMuseum.Api/             HTTP endpoints, authorization policies and composition root
 tests/
   SteamMuseum.Tests/           Domain rules, authenticated API workflows and concurrency tests
@@ -29,21 +30,21 @@ tests/
 
 Dependencies point inward: Application -> Domain; Infrastructure -> Application; API composes Infrastructure and Application. The business layer does not reference EF Core, ASP.NET Core or MySQL. Authentication implementation is kept in Infrastructure; business use cases are in Application.
 
-MySQL provider: `MySql.EntityFrameworkCore` 10.0.9. ASP.NET packages are pinned to 10.0.9; OpenIddict 7.7.1 resolves EF Core runtime dependencies to 10.0.11. Explicit converters preserve `DateOnly` and `TimeOnly` in the domain while mapping to MySQL `date` and `time(6)`. Relational joins avoid provider-specific GUID collection translation issues.
+Default provider: `Microsoft.EntityFrameworkCore.SqlServer` 10.0.11, supporting SQL Server and Azure SQL. Set `Database__Provider=MySql` for the retained `MySql.EntityFrameworkCore` 10.0.9 provider. Provider-specific migrations are selected automatically. Explicit converters preserve calendar dates, local times and UTC timestamps. See [Azure deployment](docs/azure-deployment.md) for container hosting and database configuration.
 
 ## Run locally
 
-Requirements: .NET 10 SDK, and MySQL (the Compose setup uses MySQL 8.4), or Docker with Compose. Run the following from this solution directory in PowerShell.
+Requirements: .NET 10 SDK and SQL Server, or Docker with Compose (the default setup uses SQL Server 2022 Developer for local development only). Run the following from this solution directory in PowerShell.
 
 1. Prepare the database:
 
    ```powershell
    Copy-Item .env.example .env
-   # Edit .env and replace both example passwords.
+   # Edit .env and replace MSSQL_SA_PASSWORD with a strong local-only password.
    docker compose up -d --wait
    ```
 
-   Alternatively, create a `steam_museum` database and a dedicated database user in an existing MySQL installation. Use a disposable/local account for development; application runtime does not need schema-management privileges after migrations are applied.
+   Alternatively, use SQL Server LocalDB (`Server=(localdb)\MSSQLLocalDB;Database=steam_museum;Integrated Security=True;Encrypt=True;TrustServerCertificate=True`) or create a `steam_museum` database and dedicated user in an existing SQL Server installation. Use a disposable/local account for development; application runtime does not need schema-management privileges after migrations are applied.
 
 2. Restore and build:
 
@@ -56,7 +57,8 @@ Requirements: .NET 10 SDK, and MySQL (the Compose setup uses MySQL 8.4), or Dock
 3. Configure the connection and apply the included migrations:
 
    ```powershell
-   $env:ConnectionStrings__Museum = 'Server=localhost;Port=3306;Database=steam_museum;User=museum;Password=YOUR_MYSQL_PASSWORD'
+   $env:Database__Provider = 'SqlServer'
+   $env:ConnectionStrings__Museum = 'Server=localhost,1433;Database=steam_museum;User Id=sa;Password=YOUR_LOCAL_SQL_PASSWORD;Encrypt=True;TrustServerCertificate=True'
    dotnet run --project src/SteamMuseum.Api -- --migrate
    ```
 
@@ -154,22 +156,25 @@ All business writes acquire a database-backed mutation lock inside a transaction
 # Fast relational tests using isolated SQLite databases:
 dotnet test SteamMuseum.sln
 
-# Same tests against MySQL, including real migrations and concurrent requests:
-$env:MUSEUM_TEST_MYSQL = 'Server=localhost;Port=3306;User=root;Password=YOUR_TEST_SERVER_PASSWORD'
+# Same tests against SQL Server, including real migrations and concurrent requests:
+$env:MUSEUM_TEST_SQLSERVER = 'Server=(localdb)\MSSQLLocalDB;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
 dotnet test SteamMuseum.sln
-Remove-Item Env:\MUSEUM_TEST_MYSQL
+Remove-Item Env:\MUSEUM_TEST_SQLSERVER
 ```
 
-The MySQL test account must be able to create/drop databases. Tests create and delete their own randomly named `steammuseum_test_*` databases; they do not use the database named in the connection string. Use a test server. The CI workflow runs the suite against both SQLite and MySQL 8.4.
+The SQL Server test account must be able to create/drop databases. Tests create and delete their own randomly named `steammuseum_test_*` databases; they do not use the database named in the connection string. Use a test server. The CI workflow runs the suite against SQLite, SQL Server 2022 and legacy MySQL 8.4, and builds the Docker image. To test MySQL locally, set only `MUSEUM_TEST_MYSQL` to a disposable-server connection string; keep `MUSEUM_TEST_SQLSERVER` unset.
 
-Local verification was performed with .NET SDK 10.0.401 and MySQL Server 26.7.0. See [verification record](docs/verification.md) for the final results.
+Local verification includes SQL Server LocalDB and SQLite with .NET SDK 10.0.401, plus earlier MySQL runs. See the [verification record](docs/verification.md) for results and the local Docker-engine limitation.
 
 To add migrations:
 
 ```powershell
 dotnet tool restore
-dotnet ef migrations add YourChange --project src/SteamMuseum.Infrastructure --startup-project src/SteamMuseum.Api --output-dir Migrations
+$env:Database__Provider = 'SqlServer'
+dotnet ef migrations add YourChange --project src/SteamMuseum.SqlServerMigrations --startup-project src/SteamMuseum.Api --output-dir Migrations
 ```
+
+For legacy MySQL development, use `docker compose -f compose.mysql.yaml up -d --wait`, set `Database__Provider=MySql`, and supply your MySQL connection string. Generate MySQL migrations in `src/SteamMuseum.Infrastructure` with `Database__Provider=MySql`. Moving existing records between providers requires a separate data-transfer procedure; the SQL Server migrations initialize a new database.
 
 ## Deployment configuration
 

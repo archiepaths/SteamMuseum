@@ -21,7 +21,7 @@ public sealed class MuseumDbContext(DbContextOptions<MuseumDbContext> options) :
     {
         base.ConfigureConventions(b);
         b.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
-        // Connector/NET's reader returns DateTime/TimeSpan; explicit converters preserve DateOnly/TimeOnly in the domain.
+        // Explicit conversions preserve calendar values with SQL Server, MySQL and SQLite readers.
         b.Properties<DateOnly>().HaveConversion<CalendarDateConverter>().HaveColumnType("date");
         b.Properties<TimeOnly>().HaveConversion<LocalTimeConverter>().HaveColumnType("time(6)");
     }
@@ -29,7 +29,7 @@ public sealed class MuseumDbContext(DbContextOptions<MuseumDbContext> options) :
     {
         base.OnModelCreating(b);
         b.UseOpenIddict();
-        // Subjects are the existing GUID member IDs; keep MySQL composite indexes below 3072 bytes.
+        // Subjects are existing GUID member IDs; bound their length for relational composite indexes.
         b.Entity<OpenIddictEntityFrameworkCoreAuthorization>().Property(x => x.Subject).HasMaxLength(36);
         b.Entity<OpenIddictEntityFrameworkCoreToken>().Property(x => x.Subject).HasMaxLength(36);
         b.Entity<Member>().Property(x => x.DisplayName).HasMaxLength(150);

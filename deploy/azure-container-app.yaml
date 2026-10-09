@@ -1,0 +1,88 @@
+# Replace every REPLACE_* value. See docs/azure-deployment.md before applying.
+# Configure the environment's Azure Files storage named museum-keys first.
+location: REPLACE_AZURE_REGION
+name: steam-museum-api
+identity:
+  type: UserAssigned
+  userAssignedIdentities:
+    REPLACE_USER_ASSIGNED_IDENTITY_RESOURCE_ID: {}
+properties:
+  managedEnvironmentId: REPLACE_CONTAINER_APPS_ENVIRONMENT_RESOURCE_ID
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      allowInsecure: false
+      targetPort: 8080
+      transport: http
+    secrets:
+      - name: sql-connection
+        value: REPLACE_ENCRYPTED_AZURE_SQL_CONNECTION_STRING
+    registries:
+      - server: REPLACE_ACR_LOGIN_SERVER
+        identity: REPLACE_USER_ASSIGNED_IDENTITY_RESOURCE_ID
+  template:
+    containers:
+      - name: api
+        image: REPLACE_REGISTRY_IMAGE_WITH_IMMUTABLE_TAG
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: ASPNETCORE_ENVIRONMENT
+            value: Production
+          - name: Database__Provider
+            value: SqlServer
+          - name: ConnectionStrings__Museum
+            secretRef: sql-connection
+          - name: AllowedHosts
+            value: REPLACE_API_HOSTNAME
+          - name: Cors__Origins__0
+            value: https://REPLACE_WEB_HOSTNAME
+          - name: ReverseProxy__KnownNetworks__0
+            value: REPLACE_TRUSTED_INGRESS_CIDR
+          - name: DataProtection__KeysPath
+            value: /var/steam-museum/keys
+        volumeMounts:
+          - volumeName: data-protection
+            mountPath: /var/steam-museum/keys
+        probes:
+          - type: Startup
+            httpGet:
+              path: /health/live
+              port: 8080
+              httpHeaders:
+                - name: Host
+                  value: REPLACE_API_HOSTNAME
+            periodSeconds: 5
+            failureThreshold: 30
+          - type: Liveness
+            httpGet:
+              path: /health/live
+              port: 8080
+              httpHeaders:
+                - name: Host
+                  value: REPLACE_API_HOSTNAME
+            periodSeconds: 30
+          - type: Readiness
+            httpGet:
+              path: /health/ready
+              port: 8080
+              httpHeaders:
+                - name: Host
+                  value: REPLACE_API_HOSTNAME
+            periodSeconds: 10
+    volumes:
+      - name: data-protection
+        storageType: AzureFile
+        storageName: museum-keys
+        mountOptions: uid=1654,gid=1654,file_mode=0600,dir_mode=0700
+    scale:
+      minReplicas: 0
+      maxReplicas: 2
+      rules:
+        - name: http
+          http:
+            metadata:
+              concurrentRequests: '20'
+

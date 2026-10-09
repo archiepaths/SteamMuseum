@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteamMuseum.Tests", "tests\SteamMuseum.Tests\SteamMuseum.Tests.csproj", "{FB39B52F-895E-44A6-99B1-94B0E1DDBA8C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteamMuseum.SqlServerMigrations", "src\SteamMuseum.SqlServerMigrations\SteamMuseum.SqlServerMigrations.csproj", "{C41E85FC-14E5-4EAD-A98B-72136D597992}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +89,18 @@ Global
 		{FB39B52F-895E-44A6-99B1-94B0E1DDBA8C}.Release|x64.Build.0 = Release|Any CPU
 		{FB39B52F-895E-44A6-99B1-94B0E1DDBA8C}.Release|x86.ActiveCfg = Release|Any CPU
 		{FB39B52F-895E-44A6-99B1-94B0E1DDBA8C}.Release|x86.Build.0 = Release|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Debug|x64.Build.0 = Debug|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Debug|x86.Build.0 = Debug|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Release|x64.ActiveCfg = Release|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Release|x64.Build.0 = Release|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Release|x86.ActiveCfg = Release|Any CPU
+		{C41E85FC-14E5-4EAD-A98B-72136D597992}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -97,5 +111,6 @@ Global
 		{1E95C716-E053-4FCA-87B3-BBDEE2AAF0A2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6939715A-A44A-4001-AEF1-88DB9A9AEB61} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{FB39B52F-895E-44A6-99B1-94B0E1DDBA8C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{C41E85FC-14E5-4EAD-A98B-72136D597992} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

@@ -12,3 +12,5 @@ TestResults/
 **/.npm-cache/
 **/.env.local
 **/.env.*.local
+
+deploy/*.local.yaml

@@ -7,10 +7,11 @@ public sealed class MuseumDbContextFactory : IDesignTimeDbContextFactory<MuseumD
 {
     public MuseumDbContext CreateDbContext(string[] args)
     {
+        var provider = Environment.GetEnvironmentVariable("Database__Provider");
         var connection = Environment.GetEnvironmentVariable("ConnectionStrings__Museum")
-            ?? "Server=localhost;Database=steam_museum_dev;User=museum;Password=configure-me";
-        return new(new DbContextOptionsBuilder<MuseumDbContext>().UseMySQL(connection).Options);
+            ?? DatabaseConfiguration.DefaultConnectionFor(provider);
+        var options = new DbContextOptionsBuilder<MuseumDbContext>();
+        options.UseMuseumDatabase(provider, connection);
+        return new(options.Options);
     }
 }
-
-

@@ -6,6 +6,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: ci-Disposable-password-123!
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'ci-Disposable-password-123!' -C -Q 'SELECT 1' -b -o /dev/null"
+          --health-interval=5s --health-timeout=5s --health-retries=30 --health-start-period=20s
       mysql:
         image: mysql:8.4
         env:
@@ -24,7 +33,13 @@ jobs:
       - run: dotnet build SteamMuseum.sln --no-restore --configuration Release
       - name: Tests with SQLite
         run: dotnet test SteamMuseum.sln --no-build --configuration Release
-      - name: Tests with MySQL migrations and concurrent writes
+      - name: Tests with SQL Server migrations and concurrent writes
+        run: dotnet test SteamMuseum.sln --no-build --configuration Release
+        env:
+          MUSEUM_TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=ci-Disposable-password-123!;Encrypt=True;TrustServerCertificate=True
+      - name: Tests with legacy MySQL migrations and concurrent writes
         run: dotnet test SteamMuseum.sln --no-build --configuration Release
         env:
           MUSEUM_TEST_MYSQL: Server=127.0.0.1;Port=3306;User=root;Password=ci-disposable-password;SslMode=Disabled;AllowPublicKeyRetrieval=true
+      - name: Build API container
+        run: docker build --tag steam-museum-api:ci .
