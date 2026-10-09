@@ -1,6 +1,6 @@
 # Steam Museum API
 
-A staff application for availability, competence records and rostering, built with React, TypeScript, .NET 10, EF Core 10 and MySQL.
+The API for staff availability, competence records and rostering, built with .NET 10, EF Core 10 and MySQL. The React web app is a separate project in the sibling SteamMuseumWeb folder.
 
 ## Included
 
@@ -13,7 +13,7 @@ A staff application for availability, competence records and rostering, built wi
 - Duties, draft assignments, publication and cancellation. Qualification, availability, overlap and maximum-assignment checks are enforced on the server.
 - Audit records for business changes and account administration, OpenAPI in development, database migrations, example requests and automated tests.
 
-The [React staff frontend](src/SteamMuseum.Web/README.md) includes member, planner, assessor and administrator workflows. Fleet maintenance, the full rolling stock register, group bookings, Xero integration and competence import are future modules. The locomotive list here is reference data for qualifications and duties, not a maintenance system.
+The [React staff frontend](../SteamMuseumWeb/README.md) includes member, planner, assessor and administrator workflows. Fleet maintenance, the full rolling stock register, group bookings, Xero integration and competence import are future modules. The locomotive list here is reference data for qualifications and duties, not a maintenance system.
 
 ## Architecture
 
@@ -23,7 +23,6 @@ src/
   SteamMuseum.Application/     Use cases, request/response contracts and persistence ports
   SteamMuseum.Infrastructure/  EF Core/MySQL, migrations and ASP.NET Core Identity
   SteamMuseum.Api/             HTTP endpoints, authorization policies and composition root
-  SteamMuseum.Web/             React staff frontend, API client and browser/component tests
 tests/
   SteamMuseum.Tests/           Domain rules, authenticated API workflows and concurrency tests
 ```
@@ -83,19 +82,19 @@ Requirements: .NET 10 SDK, and MySQL (the Compose setup uses MySQL 8.4), or Dock
 
 For persistent local configuration, use `dotnet user-secrets --project src/SteamMuseum.Api set "ConnectionStrings:Museum" "..."` instead of committing credentials. Normal startup neither migrates the database nor creates accounts.
 
-6. Start the React frontend (Node.js 22.22.2+ or 24.15.0+):
+6. Start the separate React frontend (Node.js 22.22.2+ or 24.15.0+):
 
    ```powershell
-   Set-Location src/SteamMuseum.Web
+   Set-Location ../SteamMuseumWeb
    npm ci
    npm run dev
    ```
 
-   Open `https://localhost:5173` and sign in with your administrator account. See the [frontend guide](src/SteamMuseum.Web/README.md) for local certificates, API configuration, tests and production hosting.
+   Open `https://localhost:5173` and sign in with your administrator account. See the [frontend guide](../SteamMuseumWeb/README.md) for local certificates, API configuration, tests and production hosting.
 
 ## Authentication from React
 
-Use HTTPS for both the API and frontend. The development frontend origin defaults to `https://localhost:5173`; use the same hostname (`localhost` on both) for SameSite cookies. Production should serve the frontend and API from the same site, ideally through one origin.
+Use HTTPS for both the API and frontend. The development frontend origin defaults to `https://localhost:5173`; use the same hostname (`localhost` on both) for SameSite cookies. Production must keep the frontend and API on the same HTTPS site for the existing SameSite=Strict cookies. Separate hosts such as https://staff.example.org and https://api.example.org are supported: build the frontend with VITE_API_URL=https://api.example.org and set Cors__Origins__0=https://staff.example.org on the API. A shared origin through a reverse proxy also works. Unrelated default cloud hostnames are cross-site and will not work with these cookies.
 
 1. Fetch `GET /api/auth/csrf` with `credentials: 'include'`.
 2. Send the returned `token` as `X-CSRF-TOKEN` on **every mutating request**, including login.
